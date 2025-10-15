@@ -1,14 +1,17 @@
-// plugin.js - Website Importer Pro - FINAL VERSION
+// plugin.js - Website Importer Pro - FINAL FIXED VERSION
 console.log("[Importer Pro] Loading...");
 
-penpot.ui.open("Website Importer Pro", "./website-importer-pro/ui.html", {
-  width: 500,
-  height: 700,
-});
+penpot.ui.open(
+  "Website Importer Pro",
+  "https://myrustycage.github.io/website-importer-pro/",
+  {
+    width: 500,
+    height: 700,
+  }
+);
 
 console.log("[Importer Pro] UI opened");
 
-// Send messages to UI
 function sendToUI(type, data) {
   try {
     penpot.ui.sendMessage({ pluginMessage: { type, ...data } });
@@ -17,7 +20,50 @@ function sendToUI(type, data) {
   }
 }
 
-// Determine element type
+// FIXED: Convert rgb() to hex
+function rgbToHex(rgbString) {
+  if (!rgbString || typeof rgbString !== "string") return "#000000";
+
+  // Already hex
+  if (rgbString.startsWith("#")) return rgbString;
+
+  // Parse rgb(r, g, b) or rgba(r, g, b, a)
+  const match = rgbString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) return "#000000";
+
+  const r = parseInt(match[1]).toString(16).padStart(2, "0");
+  const g = parseInt(match[2]).toString(16).padStart(2, "0");
+  const b = parseInt(match[3]).toString(16).padStart(2, "0");
+
+  return `#${r}${g}${b}`;
+}
+
+// FIXED: Clean Next.js font names
+function cleanFontFamily(fontFamilyStr) {
+  if (!fontFamilyStr) return "Inter";
+
+  const firstFont = fontFamilyStr.split(",")[0].replace(/['"]/g, "").trim();
+
+  // Remove __Inter_d65c78 → Inter
+  if (firstFont.startsWith("__")) {
+    const match = firstFont.match(/__([A-Za-z]+)_/);
+    if (match) return match[1];
+  }
+
+  // Remove hash suffix
+  const cleaned = firstFont.replace(/_[a-z0-9]+$/i, "");
+
+  return cleaned || "Inter";
+}
+
+// FIXED: Map to supported weights
+function normalizeFontWeight(weight) {
+  if (!weight) return "400";
+  const num = parseInt(weight);
+  if (num >= 600) return "700";
+  return "400";
+}
+
 function determineElementType(node) {
   if (node.tag === "img" || node.src) return "image";
   if (node.tag === "svg" || node.svgDataUrl) return "svg";
@@ -25,13 +71,10 @@ function determineElementType(node) {
   return "shape";
 }
 
-// Flatten nested structure into flat elements array
 function flattenStructure(structure, elements = []) {
   console.log("[Flatten] Input structure keys:", Object.keys(structure));
 
-  // Handle { nav: {...}, header: {...}, main: {...} } format
   const sections = [];
-
   for (const key in structure) {
     if (structure[key] && typeof structure[key] === "object") {
       sections.push(structure[key]);
@@ -39,14 +82,11 @@ function flattenStructure(structure, elements = []) {
   }
 
   console.log("[Flatten] Found", sections.length, "top-level sections");
-
-  // Recursively flatten each section
   sections.forEach((section) => flattenNode(section, elements, 0));
 
   return elements;
 }
 
-// Recursively flatten a node
 function flattenNode(node, elements, depth) {
   if (!node || depth > 50) return;
 
@@ -71,37 +111,42 @@ function flattenNode(node, elements, depth) {
     opacity: 1,
   };
 
-  // Parse styles if available
   if (node.styles) {
+    // FIXED: Only add fills if NOT transparent
     if (
       node.styles.backgroundColor &&
-      node.styles.backgroundColor !== "rgba(0, 0, 0, 0)"
+      node.styles.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+      node.styles.backgroundColor !== "transparent"
     ) {
-      element.fills = [
-        { fillColor: node.styles.backgroundColor, fillOpacity: 1 },
-      ];
+      const hexColor = rgbToHex(node.styles.backgroundColor);
+      element.fills = [{ fillColor: hexColor, fillOpacity: 1 }];
     }
+
     if (node.styles.fontSize) {
       element.fontSize = parseInt(node.styles.fontSize) || 16;
     }
+
+    // FIXED: Clean font family
     if (node.styles.fontFamily) {
-      element.fontFamily = node.styles.fontFamily
-        .split(",")[0]
-        .replace(/['"]/g, "")
-        .trim();
+      element.fontFamily = cleanFontFamily(node.styles.fontFamily);
     }
+
+    // FIXED: Normalize font weight
     if (node.styles.fontWeight) {
-      element.fontWeight = node.styles.fontWeight;
+      element.fontWeight = normalizeFontWeight(node.styles.fontWeight);
     }
+
+    // FIXED: Convert color to hex
     if (node.styles.color) {
-      element.color = node.styles.color;
+      element.color = rgbToHex(node.styles.color);
     }
+
     if (node.styles.opacity) {
       element.opacity = parseFloat(node.styles.opacity) || 1;
     }
   }
 
-  // Filter: only add meaningful elements
+  // FIXED: Better filtering - skip empty divs
   const isVisible = element.opacity > 0.01;
   const hasContent =
     element.text ||
@@ -110,19 +155,18 @@ function flattenNode(node, elements, depth) {
     element.imageData ||
     element.svgData ||
     (element.fills && element.fills.length > 0);
-  const hasReasonableSize = element.width > 5 && element.height > 5;
+  const hasReasonableSize = element.width > 10 && element.height > 10;
+  const notTooSmall = element.width * element.height > 100; // Skip tiny elements
 
-  if (isVisible && (hasContent || (hasReasonableSize && depth < 3))) {
+  if (isVisible && hasContent && hasReasonableSize && notTooSmall) {
     elements.push(element);
   }
 
-  // Recurse through children
   if (node.children && Array.isArray(node.children)) {
     node.children.forEach((child) => flattenNode(child, elements, depth + 1));
   }
 }
 
-// Import image from array data
 async function importImage(imageDataArray, mime, element) {
   console.log(
     "[Importer Pro] Importing image:",
@@ -139,8 +183,6 @@ async function importImage(imageDataArray, mime, element) {
       throw new Error("Image upload failed - no media ID");
     }
 
-    console.log("[Importer Pro] Image uploaded:", imageMedia.id);
-
     const rect = penpot.createRectangle();
     rect.x = element.x;
     rect.y = element.y;
@@ -155,7 +197,6 @@ async function importImage(imageDataArray, mime, element) {
   }
 }
 
-// Import SVG as PNG
 async function importSVG(imageDataArray, element) {
   console.log(
     "[Importer Pro] Importing SVG PNG, length:",
@@ -174,8 +215,6 @@ async function importSVG(imageDataArray, element) {
       throw new Error("SVG upload failed - no media ID");
     }
 
-    console.log("[Importer Pro] SVG uploaded:", imageMedia.id);
-
     const rect = penpot.createRectangle();
     rect.x = element.x;
     rect.y = element.y;
@@ -190,7 +229,6 @@ async function importSVG(imageDataArray, element) {
   }
 }
 
-// Import text element
 function importText(element) {
   try {
     const text = penpot.createText(element.text || "Text");
@@ -215,7 +253,6 @@ function importText(element) {
   }
 }
 
-// Import rectangle/shape
 function importShape(element) {
   try {
     const rect = penpot.createRectangle();
@@ -238,7 +275,6 @@ function importShape(element) {
   }
 }
 
-// Main import handler
 async function importWebsite(data) {
   console.log("[Importer Pro] Starting import...", data);
 
@@ -248,7 +284,6 @@ async function importWebsite(data) {
 
   sendToUI("progress", { message: "Processing structure...", percent: 0 });
 
-  // Flatten nested structure
   let elements = data.elements;
   if (!elements && data.structure) {
     console.log("[Importer Pro] Flattening nested structure...");
@@ -262,7 +297,6 @@ async function importWebsite(data) {
 
   sendToUI("progress", { message: "Creating board...", percent: 5 });
 
-  // Create board
   const board = penpot.createBoard();
   board.name = data.metadata?.title || "Imported Website";
 
@@ -273,7 +307,9 @@ async function importWebsite(data) {
   board.resize(width, height);
   board.x = 0;
   board.y = 0;
-  board.fills = [{ fillColor: "#ffffff", fillOpacity: 1 }];
+
+  // FIXED: Dark background
+  board.fills = [{ fillColor: "#09090b", fillOpacity: 1 }];
 
   const total = elements.length;
   let completed = 0;
@@ -281,7 +317,6 @@ async function importWebsite(data) {
 
   console.log("[Importer Pro] Processing", total, "elements");
 
-  // Process each element
   for (const element of elements) {
     try {
       let shape = null;
@@ -315,7 +350,6 @@ async function importWebsite(data) {
 
       completed++;
 
-      // Log progress every 100 elements
       if (completed % 100 === 0) {
         console.log(
           "[Importer Pro] Progress:",
@@ -341,7 +375,6 @@ async function importWebsite(data) {
   sendToUI("import-success", { imported: imported, total: total });
 }
 
-// Message handler
 penpot.ui.onMessage(async (message) => {
   const msg = message.pluginMessage || message;
 
