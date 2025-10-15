@@ -5,7 +5,7 @@
   "host": "https://myrustycage.github.io/website-importer-pro",
   "code": "./website-importer-pro/plugin.js",
   "ui": "./website-importer-pro/ui.html",
-  "icon": "./website-importer-pro/icon.jpg",
+  "icon": "./website-importer-pro/icon.png",
   "entry": "main",
   "permissions": ["content:read", "content:write"],
   "description": "Complete website import: structure, images, and SVGs with CSS conversion",
