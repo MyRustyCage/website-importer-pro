@@ -1,14 +1,10 @@
 // plugin.js - Website Importer Pro - FINAL FIXED VERSION
 console.log("[Importer Pro] Loading...");
 
-penpot.ui.open(
-  "Website Importer Pro",
-  "https://myrustycage.github.io/website-importer-pro/",
-  {
-    width: 500,
-    height: 700,
-  }
-);
+penpot.ui.open("Website Importer Pro", "./website-importer-pro/ui.html", {
+  width: 500,
+  height: 700,
+});
 
 console.log("[Importer Pro] UI opened");
 
