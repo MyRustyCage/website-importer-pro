@@ -1,0 +1,13 @@
+{
+  "name": "Website Importer Pro",
+  "version": "1.0.0",
+  "id": "website-importer-pro",
+  "host": "https://myrustycage.github.io/website-importer-pro",
+  "code": "./website-importer-pro/plugin.js",
+  "ui": "./website-importer-pro/ui.html",
+  "icon": "./website-importer-pro/icon.jpg",
+  "entry": "main",
+  "permissions": ["content:read", "content:write"],
+  "description": "Complete website import: structure, images, and SVGs with CSS conversion",
+  "author": "Web Scraper Pro"
+}

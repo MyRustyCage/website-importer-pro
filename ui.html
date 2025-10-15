@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Website Importer Pro</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        padding: 16px;
+        font-size: 13px;
+        background: #f9f9f9;
+        overflow-y: auto;
+      }
+      h3 {
+        margin-bottom: 12px;
+        font-size: 16px;
+        color: #333;
+      }
+      h4 {
+        margin: 16px 0 8px;
+        font-size: 14px;
+        color: #555;
+        border-bottom: 2px solid #ddd;
+        padding-bottom: 4px;
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+        border-bottom: 2px solid #ddd;
+      }
+      .tab {
+        padding: 8px 16px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        color: #666;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        transition: all 0.2s;
+      }
+      .tab:hover {
+        color: #333;
+      }
+      .tab.active {
+        color: #5865f2;
+        border-bottom-color: #5865f2;
+      }
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
+      input,
+      select,
+      textarea,
+      button {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 13px;
+        font-family: inherit;
+      }
+      button {
+        background: #5865f2;
+        color: white;
+        cursor: pointer;
+        font-weight: 500;
+        border: none;
+      }
+      button:hover {
+        background: #4752c4;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      button.secondary {
+        background: #6b7280;
+      }
+      button.secondary:hover {
+        background: #4b5563;
+      }
+      button.success {
+        background: #3ba55d;
+      }
+      button.success:hover {
+        background: #2d7d46;
+      }
+      label {
+        display: block;
+        margin: 12px 0 4px;
+        font-weight: 600;
+        color: #555;
+        font-size: 12px;
+      }
+      textarea {
+        min-height: 100px;
+        font-family: "Courier New", monospace;
+        font-size: 11px;
+        resize: vertical;
+      }
+      .file-input-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+        width: 100%;
+      }
+      .file-input-wrapper input[type="file"] {
+        position: absolute;
+        left: -9999px;
+      }
+      .file-input-label {
+        display: block;
+        padding: 10px;
+        background: #e7f3ff;
+        color: #0969da;
+        text-align: center;
+        border: 2px dashed #0969da;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .file-input-label:hover {
+        background: #d4e9ff;
+      }
+      .file-selected {
+        background: #d4f4dd;
+        border-color: #1a7f37;
+        color: #1a7f37;
+      }
+      #status,
+      #progress {
+        margin-top: 12px;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      #status {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .ok {
+        background: #d4f4dd;
+        color: #1a7f37;
+        border: 1px solid #1a7f37;
+      }
+      .err {
+        background: #fde7e9;
+        color: #b42318;
+        border: 1px solid #b42318;
+      }
+      .info {
+        background: #e7f3ff;
+        color: #0969da;
+        border: 1px solid #0969da;
+      }
+      .progress {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffc107;
+      }
+      .progress-bar {
+        height: 4px;
+        background: #e0e0e0;
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 8px;
+      }
+      .progress-fill {
+        height: 100%;
+        background: #5865f2;
+        width: 0%;
+        transition: width 0.3s;
+      }
+      .section {
+        background: white;
+        padding: 12px;
+        border-radius: 6px;
+        margin-bottom: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      .help-text {
+        font-size: 11px;
+        color: #6b7280;
+        margin-top: -6px;
+        margin-bottom: 10px;
+      }
+      .json-preview {
+        max-height: 150px;
+        overflow-y: auto;
+        background: #f8f9fa;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-family: monospace;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>🚀 Website Importer Pro</h3>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="all-in-one">All-in-One</button>
+      <button class="tab" data-tab="json-only">JSON Only</button>
+      <button class="tab" data-tab="image-url">Image URL</button>
+      <button class="tab" data-tab="svg-clean">SVG Cleaner</button>
+    </div>
+
+    <!-- TAB 1: ALL-IN-ONE IMPORTER -->
+    <div id="all-in-one" class="tab-content active">
+      <div class="section">
+        <h4>📦 Complete Website Import</h4>
+        <p class="help-text">
+          Upload JSON from Puppeteer scraper with embedded images, SVGs, text,
+          and layout.
+        </p>
+
+        <div class="file-input-wrapper">
+          <input type="file" id="json-file-all" accept=".json" />
+          <label
+            for="json-file-all"
+            class="file-input-label"
+            id="json-label-all"
+          >
+            📄 Choose JSON File
+          </label>
+        </div>
+
+        <div id="json-preview-all" class="json-preview" style="display: none">
+          <strong>Preview:</strong>
+          <pre id="json-content-all"></pre>
+        </div>
+
+        <button id="import-all-btn" class="success" disabled>
+          🚀 Import Everything
+        </button>
+      </div>
+
+      <div id="progress" style="display: none">
+        <div id="progress-message">Processing...</div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: JSON ONLY (No embedded data) -->
+    <div id="json-only" class="tab-content">
+      <div class="section">
+        <h4>📋 JSON Structure Only</h4>
+        <p class="help-text">
+          Import just the layout and text (no images/SVGs).
+        </p>
+
+        <div class="file-input-wrapper">
+          <input type="file" id="json-file-simple" accept=".json" />
+          <label
+            for="json-file-simple"
+            class="file-input-label"
+            id="json-label-simple"
+          >
+            📄 Choose JSON File
+          </label>
+        </div>
+
+        <button id="import-simple-btn" disabled>Import Structure</button>
+      </div>
+    </div>
+
+    <!-- TAB 3: IMAGE URL IMPORTER -->
+    <div id="image-url" class="tab-content">
+      <div class="section">
+        <h4>🖼️ Import Image from URL</h4>
+        <p class="help-text">
+          Fetch any image from the web with automatic CORS proxy fallback.
+        </p>
+
+        <label for="image-url-input">Image URL:</label>
+        <input
+          type="url"
+          id="image-url-input"
+          placeholder="https://example.com/image.jpg"
+        />
+
+        <button id="import-image-btn">Import Image</button>
+      </div>
+    </div>
+
+    <!-- TAB 4: SVG CLEANER -->
+    <div id="svg-clean" class="tab-content">
+      <div class="section">
+        <h4>🧪 SVG CSS-to-Native Converter</h4>
+        <p class="help-text">
+          Test CSS mask-image, Tailwind classes, and pattern conversion.
+        </p>
+
+        <label for="test-case">Test Case:</label>
+        <select id="test-case">
+          <option value="tuina-visible">Tuina Pattern (50% opacity)</option>
+          <option value="tuina-original">Tuina Pattern (5% opacity)</option>
+          <option value="simple-pattern">Simple Pattern (red grid)</option>
+          <option value="simple-mask">Linear Gradient Mask</option>
+          <option value="stroke-classes">Tailwind Stroke Classes</option>
+          <option value="custom">Custom SVG</option>
+        </select>
+
+        <div id="custom-svg-input" style="display: none">
+          <label>Paste your SVG:</label>
+          <textarea id="custom-svg"></textarea>
+        </div>
+
+        <button id="clean-svg-btn">🔧 Clean SVG</button>
+
+        <label>Cleaned Output:</label>
+        <textarea id="cleaned-output" readonly></textarea>
+
+        <button id="import-svg-btn" class="success" disabled>
+          📤 Import to Penpot
+        </button>
+      </div>
+    </div>
+
+    <div id="status" class="info">
+      Select a tab and choose your import method.
+    </div>
+
+    <script>
+      // ========================================
+      // GLOBAL STATE & UTILITIES
+      // ========================================
+
+      let currentData = null;
+      const statusEl = document.getElementById("status");
+      const progressEl = document.getElementById("progress");
+      const progressFill = document.getElementById("progress-fill");
+      const progressMessage = document.getElementById("progress-message");
+
+      function setStatus(msg, type = "info") {
+        statusEl.textContent = msg;
+        statusEl.className = type;
+        statusEl.style.display = "block";
+      }
+
+      function setProgress(message, percent) {
+        progressEl.style.display = "block";
+        progressEl.className = "progress";
+        progressMessage.textContent = message;
+        progressFill.style.width = percent + "%";
+      }
+
+      function hideProgress() {
+        progressEl.style.display = "none";
+      }
+
+      // ========================================
+      // TAB SWITCHING
+      // ========================================
+
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          // Remove active from all tabs
+          document
+            .querySelectorAll(".tab")
+            .forEach((t) => t.classList.remove("active"));
+          document
+            .querySelectorAll(".tab-content")
+            .forEach((c) => c.classList.remove("active"));
+
+          // Add active to clicked tab
+          tab.classList.add("active");
+          const tabId = tab.getAttribute("data-tab");
+          document.getElementById(tabId).classList.add("active");
+
+          setStatus("Tab switched. Ready to import.", "info");
+          hideProgress();
+        });
+      });
+
+      // ========================================
+      // SVG TEST CASES
+      // ========================================
+
+      const svgTestCases = {
+        "tuina-visible": `<svg class="stroke-white/50 [mask-image:radial-gradient(75%_50%_at_top_center,white,transparent)]" width="800" height="600">
+  <defs>
+    <pattern id="hero" width="80" height="80" patternUnits="userSpaceOnUse">
+      <path d="M.5 200V.5H200" fill="none"></path>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="#1a1a1a"/>
+  <rect width="100%" height="100%" fill="url(#hero)"></rect>
+</svg>`,
+
+        "tuina-original": `<svg class="stroke-white/5 [mask-image:radial-gradient(75%_50%_at_top_center,white,transparent)]" width="800" height="600">
+  <defs>
+    <pattern id="hero" width="80" height="80" patternUnits="userSpaceOnUse">
+      <path d="M.5 200V.5H200" fill="none"></path>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="#1a1a1a"/>
+  <rect width="100%" height="100%" fill="url(#hero)"></rect>
+</svg>`,
+
+        "simple-pattern": `<svg width="800" height="600">
+  <defs>
+    <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse">
+      <path d="M 80 0 L 0 0 0 80" fill="none" stroke="red" stroke-width="2"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="white"/>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+</svg>`,
+
+        "simple-mask": `<svg width="800" height="600" style="mask-image: linear-gradient(to bottom, black, transparent);">
+  <rect x="10" y="10" width="780" height="580" fill="blue"/>
+</svg>`,
+
+        "stroke-classes": `<svg class="stroke-red-500/50" width="800" height="600" style="stroke-width: 2px;">
+  <circle cx="400" cy="300" r="150" fill="none"/>
+</svg>`,
+      };
+
+      // ========================================
+      // SVG CLEANER FUNCTIONS (from svg-cleaner plugin)
+      // ========================================
+
+      function cleanSVG(svgString) {
+        console.log("[Cleaner] Starting...");
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgString, "image/svg+xml");
+
+        const parseError = doc.querySelector("parsererror");
+        if (parseError) {
+          throw new Error("SVG parsing failed");
+        }
+
+        const svg = doc.documentElement;
+
+        // Helper functions
+        function parseTailwindColor(colorName) {
+          const colors = {
+            red: "#ef4444",
+            blue: "#3b82f6",
+            green: "#22c55e",
+            white: "#ffffff",
+            black: "#000000",
+            gray: "#6b7280",
+          };
+          return colors[colorName] || colorName;
+        }
+
+        function extractMaskFromClass(classStr) {
+          if (!classStr) return null;
+          const match = classStr.match(/\[mask-image:([^\]]+)\]/);
+          return match ? match[1] : null;
+        }
+
+        function convertRadialMask(maskCSS, svgElement) {
+          const radialMatch = maskCSS.match(/radial-gradient\(([^)]+)\)/);
+          if (!radialMatch) return null;
+
+          const params = radialMatch[1];
+          const parts = params.split(",").map((p) => p.trim());
+
+          let cx = "50%",
+            cy = "50%",
+            r = "50%";
+          let stops = [];
+
+          const firstPart = parts[0].replace(/_/g, " ");
+
+          if (firstPart.includes("at")) {
+            const [size, pos] = firstPart.split("at").map((s) => s.trim());
+            const sizeVals = size.split(/\s+/).filter((v) => v);
+            r = sizeVals[0] || "50%";
+
+            if (pos.includes("top")) cy = "0%";
+            if (pos.includes("bottom")) cy = "100%";
+            if (pos.includes("left")) cx = "0%";
+            if (pos.includes("right")) cx = "100%";
+            if (pos.includes("center")) {
+              if (!pos.includes("top") && !pos.includes("bottom")) cy = "50%";
+              if (!pos.includes("left") && !pos.includes("right")) cx = "50%";
+            }
+          }
+
+          for (let i = 1; i < parts.length; i++) {
+            const color = parts[i];
+            if (color.includes("transparent")) {
+              stops.push({ offset: "100%", color: "white", opacity: "0" });
+            } else if (color.includes("white")) {
+              stops.push({ offset: "0%", color: "white", opacity: "1" });
+            }
+          }
+
+          let defs = svgElement.querySelector("defs");
+          if (!defs) {
+            defs = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "defs"
+            );
+            svgElement.insertBefore(defs, svgElement.firstChild);
+          }
+
+          const gradientId = "grad-" + Math.random().toString(36).substr(2, 9);
+          const gradient = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "radialGradient"
+          );
+          gradient.setAttribute("id", gradientId);
+          gradient.setAttribute("cx", cx);
+          gradient.setAttribute("cy", cy);
+          gradient.setAttribute("r", r);
+
+          stops.forEach((stop) => {
+            const stopEl = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "stop"
+            );
+            stopEl.setAttribute("offset", stop.offset);
+            stopEl.setAttribute("stop-color", stop.color);
+            stopEl.setAttribute("stop-opacity", stop.opacity);
+            gradient.appendChild(stopEl);
+          });
+
+          const maskId = "mask-" + Math.random().toString(36).substr(2, 9);
+          const mask = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "mask"
+          );
+          mask.setAttribute("id", maskId);
+
+          const maskRect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+          );
+          maskRect.setAttribute("width", "100%");
+          maskRect.setAttribute("height", "100%");
+          maskRect.setAttribute("fill", `url(#${gradientId})`);
+          mask.appendChild(maskRect);
+
+          defs.appendChild(gradient);
+          defs.appendChild(mask);
+
+          return maskId;
+        }
+
+        function convertLinearMask(maskCSS, svgElement) {
+          const linearMatch = maskCSS.match(/linear-gradient\(([^)]+)\)/);
+          if (!linearMatch) return null;
+
+          const params = linearMatch[1];
+          const parts = params.split(",").map((p) => p.trim());
+
+          let x1 = "0%",
+            y1 = "0%",
+            x2 = "0%",
+            y2 = "100%";
+          let stops = [];
+          let startIndex = 0;
+
+          if (parts[0].includes("to ")) {
+            const direction = parts[0];
+            if (direction.includes("bottom")) {
+              x1 = "0%";
+              y1 = "0%";
+              x2 = "0%";
+              y2 = "100%";
+            } else if (direction.includes("top")) {
+              x1 = "0%";
+              y1 = "100%";
+              x2 = "0%";
+              y2 = "0%";
+            } else if (direction.includes("right")) {
+              x1 = "0%";
+              y1 = "0%";
+              x2 = "100%";
+              y2 = "0%";
+            } else if (direction.includes("left")) {
+              x1 = "100%";
+              y1 = "0%";
+              x2 = "0%";
+              y2 = "0%";
+            }
+            startIndex = 1;
+          }
+
+          for (let i = startIndex; i < parts.length; i++) {
+            const color = parts[i];
+            const offset = i === startIndex ? "0%" : "100%";
+            if (color.includes("transparent"))
+              stops.push({ offset, color: "white", opacity: "0" });
+            else if (color.includes("black"))
+              stops.push({ offset, color: "white", opacity: "1" });
+            else if (color.includes("white"))
+              stops.push({ offset, color: "white", opacity: "1" });
+          }
+
+          let defs = svgElement.querySelector("defs");
+          if (!defs) {
+            defs = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "defs"
+            );
+            svgElement.insertBefore(defs, svgElement.firstChild);
+          }
+
+          const gradientId = "grad-" + Math.random().toString(36).substr(2, 9);
+          const gradient = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "linearGradient"
+          );
+          gradient.setAttribute("id", gradientId);
+          gradient.setAttribute("x1", x1);
+          gradient.setAttribute("y1", y1);
+          gradient.setAttribute("x2", x2);
+          gradient.setAttribute("y2", y2);
+
+          stops.forEach((stop) => {
+            const stopEl = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "stop"
+            );
+            stopEl.setAttribute("offset", stop.offset);
+            stopEl.setAttribute("stop-color", stop.color);
+            stopEl.setAttribute("stop-opacity", stop.opacity);
+            gradient.appendChild(stopEl);
+          });
+
+          const maskId = "mask-" + Math.random().toString(36).substr(2, 9);
+          const mask = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "mask"
+          );
+          mask.setAttribute("id", maskId);
+
+          const maskRect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect"
+          );
+          maskRect.setAttribute("width", "100%");
+          maskRect.setAttribute("height", "100%");
+          maskRect.setAttribute("fill", `url(#${gradientId})`);
+          mask.appendChild(maskRect);
+
+          defs.appendChild(gradient);
+          defs.appendChild(mask);
+
+          return maskId;
+        }
+
+        // Process SVG
+        const classAttr = svg.getAttribute("class");
+        const styleAttr = svg.getAttribute("style");
+
+        let rootStroke = null;
+        let rootStrokeOpacity = null;
+        let rootStrokeWidth = null;
+
+        // Handle mask from class
+        if (classAttr) {
+          const maskCSS = extractMaskFromClass(classAttr);
+          if (maskCSS) {
+            let maskId = null;
+            if (maskCSS.includes("radial-gradient"))
+              maskId = convertRadialMask(maskCSS, svg);
+            else if (maskCSS.includes("linear-gradient"))
+              maskId = convertLinearMask(maskCSS, svg);
+
+            if (maskId) {
+              Array.from(svg.children).forEach((child) => {
+                if (child.tagName !== "defs") {
+                  const fillAttr = child.getAttribute("fill");
+                  if (fillAttr && fillAttr.includes("url(#")) {
+                    child.setAttribute("mask", `url(#${maskId})`);
+                  }
+                }
+              });
+            }
+          }
+
+          const strokeMatch = classAttr.match(
+            /stroke-([a-z]+)(?:-\d+)?\/(\d+)/
+          );
+          if (strokeMatch) {
+            const color = strokeMatch[1];
+            const opacity = parseInt(strokeMatch[2]) / 100;
+            rootStroke = parseTailwindColor(color);
+            rootStrokeOpacity = opacity.toString();
+            svg.setAttribute("stroke", rootStroke);
+            svg.setAttribute("stroke-opacity", rootStrokeOpacity);
+          }
+        }
+
+        // Handle mask from style
+        if (styleAttr && styleAttr.includes("mask-image")) {
+          const maskMatch = styleAttr.match(/mask-image:\s*([^;]+)/);
+          if (maskMatch) {
+            const maskCSS = maskMatch[1];
+            let maskId = null;
+            if (maskCSS.includes("radial-gradient"))
+              maskId = convertRadialMask(maskCSS, svg);
+            else if (maskCSS.includes("linear-gradient"))
+              maskId = convertLinearMask(maskCSS, svg);
+
+            if (maskId) {
+              Array.from(svg.children).forEach((child) => {
+                if (child.tagName !== "defs") {
+                  child.setAttribute("mask", `url(#${maskId})`);
+                }
+              });
+            }
+          }
+        }
+
+        if (styleAttr && styleAttr.includes("stroke-width")) {
+          const widthMatch = styleAttr.match(/stroke-width:\s*([^;]+)/);
+          if (widthMatch) {
+            rootStrokeWidth = widthMatch[1].trim();
+            svg.setAttribute("stroke-width", rootStrokeWidth);
+          }
+        }
+
+        if (!svg.getAttribute("width")) svg.setAttribute("width", "800");
+        if (!svg.getAttribute("height")) svg.setAttribute("height", "600");
+        svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+        svg.removeAttribute("class");
+        svg.removeAttribute("style");
+        svg.removeAttribute("aria-hidden");
+
+        svg.querySelectorAll("*").forEach((el) => {
+          el.removeAttribute("class");
+
+          if (
+            el.tagName === "path" &&
+            el.getAttribute("fill") === "none" &&
+            rootStroke
+          ) {
+            el.setAttribute("stroke", rootStroke);
+            if (rootStrokeOpacity)
+              el.setAttribute("stroke-opacity", rootStrokeOpacity);
+            if (!el.getAttribute("stroke-width"))
+              el.setAttribute("stroke-width", "1");
+          }
+
+          if (
+            ["circle", "ellipse", "rect", "polygon"].includes(el.tagName) &&
+            el.getAttribute("fill") === "none" &&
+            rootStroke
+          ) {
+            el.setAttribute("stroke", rootStroke);
+            if (rootStrokeOpacity)
+              el.setAttribute("stroke-opacity", rootStrokeOpacity);
+            if (rootStrokeWidth)
+              el.setAttribute("stroke-width", rootStrokeWidth);
+          }
+
+          const elStyle = el.getAttribute("style");
+          if (elStyle) {
+            const styles = elStyle.split(";").reduce((acc, s) => {
+              const [prop, val] = s.split(":").map((x) => x.trim());
+              if (prop && val) acc[prop] = val;
+              return acc;
+            }, {});
+
+            if (styles.stroke) el.setAttribute("stroke", styles.stroke);
+            if (styles["stroke-width"])
+              el.setAttribute("stroke-width", styles["stroke-width"]);
+            if (styles.fill) el.setAttribute("fill", styles.fill);
+            if (styles.opacity) el.setAttribute("opacity", styles.opacity);
+
+            el.removeAttribute("style");
+          }
+        });
+
+        const serializer = new XMLSerializer();
+        let result = serializer.serializeToString(svg);
+
+        if (
+          !result.match(/<svg[^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)
+        ) {
+          result = result.replace(
+            /<svg\s/,
+            '<svg xmlns="http://www.w3.org/2000/svg" '
+          );
+        }
+
+        return result;
+      }
+
+      async function convertSVGtoPNG(svgString) {
+        return new Promise((resolve, reject) => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(svgString, "image/svg+xml");
+          const svg = doc.documentElement;
+
+          const width = parseInt(svg.getAttribute("width") || "800");
+          const height = parseInt(svg.getAttribute("height") || "600");
+
+          const svgTagMatch = svgString.match(/<svg[^>]*>/);
+          const svgTag = svgTagMatch ? svgTagMatch[0] : "";
+
+          let fixedSVG = svgString;
+          if (!svgTag.includes('xmlns="http://www.w3.org/2000/svg"')) {
+            fixedSVG = fixedSVG.replace(
+              /<svg\s/,
+              '<svg xmlns="http://www.w3.org/2000/svg" '
+            );
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+
+          ctx.clearRect(0, 0, width, height);
+
+          const img = new Image();
+          const svgBase64 = btoa(unescape(encodeURIComponent(fixedSVG)));
+          const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
+
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob(async (pngBlob) => {
+              if (!pngBlob) {
+                reject(new Error("Failed to create PNG"));
+                return;
+              }
+
+              const arrayBuffer = await pngBlob.arrayBuffer();
+              const uint8Array = new Uint8Array(arrayBuffer);
+
+              resolve({
+                imageData: Array.from(uint8Array),
+                width: width,
+                height: height,
+              });
+            }, "image/png");
+          };
+
+          img.onerror = () => reject(new Error("SVG load failed"));
+          img.src = dataUrl;
+        });
+      }
+
+      // ========================================
+      // IMAGE FETCHER (with CORS proxy)
+      // ========================================
+
+      async function fetchImage(url) {
+        try {
+          console.log("[Fetcher] Direct fetch:", url);
+          const response = await fetch(url, { mode: "cors" });
+          if (response.ok) return response;
+          throw new Error(`HTTP ${response.status}`);
+        } catch (directError) {
+          console.log("[Fetcher] Direct failed, trying proxy...");
+
+          const corsProxies = [
+            `https://corsproxy.io/?${encodeURIComponent(url)}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+          ];
+
+          for (const proxyUrl of corsProxies) {
+            try {
+              const response = await fetch(proxyUrl);
+              if (response.ok) return response;
+            } catch (e) {
+              continue;
+            }
+          }
+
+          throw new Error("All fetch methods failed");
+        }
+      }
+
+      // ========================================
+      // TAB 1: ALL-IN-ONE IMPORTER
+      // ========================================
+
+      const jsonFileAll = document.getElementById("json-file-all");
+      const jsonLabelAll = document.getElementById("json-label-all");
+      const jsonPreviewAll = document.getElementById("json-preview-all");
+      const jsonContentAll = document.getElementById("json-content-all");
+      const importAllBtn = document.getElementById("import-all-btn");
+
+      jsonFileAll.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        jsonLabelAll.textContent = `✅ ${file.name}`;
+        jsonLabelAll.classList.add("file-selected");
+
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+
+          // Show preview
+          jsonContentAll.textContent =
+            JSON.stringify(data, null, 2).substring(0, 500) + "...";
+          jsonPreviewAll.style.display = "block";
+
+          currentData = data;
+          importAllBtn.disabled = false;
+          setStatus(
+            `Loaded ${data.elements?.length || 0} elements. Ready to import!`,
+            "ok"
+          );
+        } catch (err) {
+          setStatus("Invalid JSON file: " + err.message, "err");
+          importAllBtn.disabled = true;
+        }
+      });
+
+      importAllBtn.addEventListener("click", async () => {
+        if (!currentData) return;
+
+        setStatus("Processing website data...", "info");
+        setProgress("Starting import...", 0);
+        importAllBtn.disabled = true;
+
+        try {
+          const elements = currentData.elements || [];
+          const total = elements.length;
+          let processed = 0;
+
+          // Process each element
+          for (const element of elements) {
+            const percent = (processed / total) * 100;
+            setProgress(
+              `Processing ${element.name || element.type}...`,
+              percent
+            );
+
+            // Fetch images if URL provided
+            if (
+              element.type === "image" &&
+              element.imageUrl &&
+              !element.imageData
+            ) {
+              try {
+                const response = await fetchImage(element.imageUrl);
+                const arrayBuffer = await response.arrayBuffer();
+                const uint8Array = new Uint8Array(arrayBuffer);
+                element.imageData = Array.from(uint8Array);
+
+                // Detect MIME
+                element.mime = "image/png";
+                if (uint8Array[0] === 0xff && uint8Array[1] === 0xd8)
+                  element.mime = "image/jpeg";
+                else if (uint8Array[0] === 0x89 && uint8Array[1] === 0x50)
+                  element.mime = "image/png";
+              } catch (err) {
+                console.error(
+                  "[All-in-One] Image fetch failed:",
+                  element.imageUrl,
+                  err
+                );
+              }
+            }
+
+            // Clean SVGs if SVG string provided
+            if (
+              element.type === "svg" &&
+              element.svgString &&
+              !element.svgData
+            ) {
+              try {
+                const cleaned = cleanSVG(element.svgString);
+                const pngData = await convertSVGtoPNG(cleaned);
+                element.svgData = pngData.imageData;
+                element.width = pngData.width;
+                element.height = pngData.height;
+              } catch (err) {
+                console.error("[All-in-One] SVG clean failed:", err);
+              }
+            }
+
+            processed++;
+          }
+
+          setProgress("Sending to Penpot...", 100);
+
+          // Send to plugin
+          parent.postMessage(
+            {
+              pluginMessage: {
+                type: "import-website",
+                data: currentData,
+              },
+            },
+            "*"
+          );
+        } catch (err) {
+          setStatus("Import failed: " + err.message, "err");
+          importAllBtn.disabled = false;
+          hideProgress();
+        }
+      });
+
+      // ========================================
+      // TAB 2: JSON ONLY (Simple)
+      // ========================================
+
+      const jsonFileSimple = document.getElementById("json-file-simple");
+      const jsonLabelSimple = document.getElementById("json-label-simple");
+      const importSimpleBtn = document.getElementById("import-simple-btn");
+
+      jsonFileSimple.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        jsonLabelSimple.textContent = `✅ ${file.name}`;
+        jsonLabelSimple.classList.add("file-selected");
+
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+          currentData = data;
+          importSimpleBtn.disabled = false;
+          setStatus("JSON loaded. Ready to import structure only.", "ok");
+        } catch (err) {
+          setStatus("Invalid JSON: " + err.message, "err");
+        }
+      });
+
+      importSimpleBtn.addEventListener("click", () => {
+        if (!currentData) return;
+
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "import-website",
+              data: currentData,
+            },
+          },
+          "*"
+        );
+      });
+
+      // ========================================
+      // TAB 3: IMAGE URL IMPORTER
+      // ========================================
+
+      const imageUrlInput = document.getElementById("image-url-input");
+      const importImageBtn = document.getElementById("import-image-btn");
+
+      importImageBtn.addEventListener("click", async () => {
+        const url = imageUrlInput.value.trim();
+        if (!url) {
+          setStatus("Please enter an image URL", "err");
+          return;
+        }
+
+        setStatus("Fetching image...", "info");
+        importImageBtn.disabled = true;
+
+        try {
+          const response = await fetchImage(url);
+          const arrayBuffer = await response.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+
+          let mime = "image/png";
+          if (uint8Array[0] === 0xff && uint8Array[1] === 0xd8)
+            mime = "image/jpeg";
+          else if (uint8Array[0] === 0x89 && uint8Array[1] === 0x50)
+            mime = "image/png";
+          else if (uint8Array[0] === 0x47 && uint8Array[1] === 0x49)
+            mime = "image/gif";
+
+          setStatus("Uploading to Penpot...", "info");
+
+          parent.postMessage(
+            {
+              pluginMessage: {
+                type: "import-image",
+                imageData: Array.from(uint8Array),
+                mime: mime,
+                element: {
+                  x: 100,
+                  y: 100,
+                  width: 600,
+                  height: 400,
+                  name: "Image",
+                },
+              },
+            },
+            "*"
+          );
+        } catch (err) {
+          setStatus("Failed: " + err.message, "err");
+          importImageBtn.disabled = false;
+        }
+      });
+
+      // ========================================
+      // TAB 4: SVG CLEANER
+      // ========================================
+
+      const testCaseSelect = document.getElementById("test-case");
+      const customSvgInput = document.getElementById("custom-svg-input");
+      const customSvgTextarea = document.getElementById("custom-svg");
+      const cleanSvgBtn = document.getElementById("clean-svg-btn");
+      const cleanedOutput = document.getElementById("cleaned-output");
+      const importSvgBtn = document.getElementById("import-svg-btn");
+
+      let currentCleanedSVG = null;
+
+      testCaseSelect.addEventListener("change", () => {
+        if (testCaseSelect.value === "custom") {
+          customSvgInput.style.display = "block";
+        } else {
+          customSvgInput.style.display = "none";
+        }
+      });
+
+      cleanSvgBtn.addEventListener("click", () => {
+        try {
+          let svgInput;
+          if (testCaseSelect.value === "custom") {
+            svgInput = customSvgTextarea.value;
+          } else {
+            svgInput = svgTestCases[testCaseSelect.value];
+          }
+
+          if (!svgInput) {
+            setStatus("Please select or paste an SVG", "err");
+            return;
+          }
+
+          setStatus("Cleaning SVG...", "info");
+          const cleaned = cleanSVG(svgInput);
+          cleanedOutput.value = cleaned;
+          currentCleanedSVG = cleaned;
+          importSvgBtn.disabled = false;
+          setStatus("SVG cleaned! Ready to import.", "ok");
+        } catch (err) {
+          setStatus("Clean failed: " + err.message, "err");
+          importSvgBtn.disabled = true;
+        }
+      });
+
+      importSvgBtn.addEventListener("click", async () => {
+        if (!currentCleanedSVG) return;
+
+        setStatus("Converting SVG to PNG...", "info");
+        importSvgBtn.disabled = true;
+
+        try {
+          const pngData = await convertSVGtoPNG(currentCleanedSVG);
+
+          setStatus("Sending to Penpot...", "info");
+
+          parent.postMessage(
+            {
+              pluginMessage: {
+                type: "import-svg",
+                svgData: pngData.imageData,
+                element: {
+                  x: 100,
+                  y: 100,
+                  width: pngData.width,
+                  height: pngData.height,
+                  name: "SVG",
+                },
+              },
+            },
+            "*"
+          );
+        } catch (err) {
+          setStatus("Failed: " + err.message, "err");
+          importSvgBtn.disabled = false;
+        }
+      });
+
+      // ========================================
+      // MESSAGE LISTENER (from plugin)
+      // ========================================
+
+      window.addEventListener("message", (event) => {
+        const msg = event.data && event.data.pluginMessage;
+        if (!msg) return;
+
+        if (msg.type === "import-success") {
+          setStatus("✅ Import successful!", "ok");
+          hideProgress();
+          importAllBtn.disabled = false;
+          importImageBtn.disabled = false;
+          importSvgBtn.disabled = false;
+        } else if (msg.type === "import-error") {
+          setStatus("❌ " + msg.error, "err");
+          hideProgress();
+          importAllBtn.disabled = false;
+          importImageBtn.disabled = false;
+          importSvgBtn.disabled = false;
+        } else if (msg.type === "progress") {
+          setProgress(msg.message, msg.percent);
+        }
+      });
+    </script>
+  </body>
+</html>
