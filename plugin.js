@@ -11,13 +11,13 @@ console.log("[Importer Pro] UI opened");
 // Send messages to UI
 function sendToUI(type, data) {
   try {
-    penpot.ui.sendMessage({ type, ...data });
+    penpot.ui.sendMessage({ pluginMessage: { type, ...data } });
   } catch (e) {
     console.error("[Importer Pro] sendToUI error:", e);
   }
 }
 
-// Manual string to bytes conversion (no TextEncoder in plugin context)
+// Manual string to bytes conversion
 function stringToUint8Array(str) {
   const utf8 = unescape(encodeURIComponent(str));
   const len = utf8.length;
@@ -47,7 +47,6 @@ async function importImage(imageDataArray, mime, element) {
 
     console.log("[Importer Pro] Image uploaded:", imageMedia.id);
 
-    // Create rectangle with image
     const rect = penpot.createRectangle();
     rect.x = element.x;
     rect.y = element.y;
@@ -62,13 +61,15 @@ async function importImage(imageDataArray, mime, element) {
   }
 }
 
-// Import SVG as PNG (converted from cleaned SVG)
-async function importSVG(svgString, element) {
-  console.log("[Importer Pro] Importing SVG, length:", svgString.length);
+// Import SVG as PNG
+async function importSVG(imageDataArray, element) {
+  console.log(
+    "[Importer Pro] Importing SVG PNG, length:",
+    imageDataArray.length
+  );
 
   try {
-    // SVG is already cleaned by UI, just convert to PNG data
-    const uint8 = stringToUint8Array(svgString);
+    const uint8 = new Uint8Array(imageDataArray);
     const imageMedia = await penpot.uploadMediaData(
       "image",
       uint8,
@@ -138,7 +139,6 @@ async function importWebsite(data) {
 
   sendToUI("progress", { message: "Creating board...", percent: 0 });
 
-  // Create board
   const board = penpot.createBoard();
   board.name = data.metadata?.title || "Imported Website";
   board.resize(data.metadata?.width || 1920, data.metadata?.height || 1080);
@@ -150,7 +150,6 @@ async function importWebsite(data) {
   const total = elements.length;
   let completed = 0;
 
-  // Process each element
   for (const element of elements) {
     try {
       let shape = null;
@@ -188,7 +187,6 @@ async function importWebsite(data) {
       completed++;
     } catch (err) {
       console.error("[Importer Pro] Element import failed:", element.name, err);
-      // Continue with other elements
     }
   }
 
@@ -197,27 +195,30 @@ async function importWebsite(data) {
   sendToUI("import-success", {});
 }
 
-// Message handler
+// Message handler - FIXED
 penpot.ui.onMessage(async (message) => {
-  console.log("[Importer Pro] Received message:", message.type);
+  // The message structure from parent.postMessage
+  const msg = message.pluginMessage || message;
 
-  if (message.type === "import-website") {
+  console.log("[Importer Pro] Received message type:", msg.type);
+
+  if (msg.type === "import-website") {
     try {
-      await importWebsite(message.data);
+      await importWebsite(msg.data);
     } catch (err) {
       console.error("[Importer Pro] Import error:", err);
       sendToUI("import-error", { error: err.message });
     }
-  } else if (message.type === "import-image") {
+  } else if (msg.type === "import-image") {
     try {
-      await importImage(message.imageData, message.mime, message.element);
+      await importImage(msg.imageData, msg.mime, msg.element);
       sendToUI("import-success", {});
     } catch (err) {
       sendToUI("import-error", { error: err.message });
     }
-  } else if (message.type === "import-svg") {
+  } else if (msg.type === "import-svg") {
     try {
-      await importSVG(message.svgData, message.element);
+      await importSVG(msg.svgData, msg.element);
       sendToUI("import-success", {});
     } catch (err) {
       sendToUI("import-error", { error: err.message });

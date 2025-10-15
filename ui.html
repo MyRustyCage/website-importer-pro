@@ -999,10 +999,8 @@
           // Send to plugin
           parent.postMessage(
             {
-              pluginMessage: {
-                type: "import-website",
-                data: currentData,
-              },
+              type: "import-website",
+              data: currentData,
             },
             "*"
           );
