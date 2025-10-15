@@ -1,363 +1,470 @@
-// plugin.js - Unified Website Importer Pro
-console.log("[Importer Pro] Loading...");
+// Enhanced Website Importer - Real Images & SVGs
+penpot.ui.open(
+  "Website Importer Pro",
+  "https://myrustycage.github.io/website-importer-pro/",
+  {
+    width: 500,
+    height: 700,
+  }
+);
 
-penpot.ui.open("Website Importer Pro", "./website-importer-pro/ui.html", {
-  width: 500,
-  height: 700,
-});
-
-console.log("[Importer Pro] UI opened");
-
-// Send messages to UI
+// Send message to UI
 function sendToUI(type, data) {
   try {
-    penpot.ui.sendMessage({ pluginMessage: { type, ...data } });
+    penpot.ui.sendMessage({ type, ...data });
   } catch (e) {
-    console.error("[Importer Pro] sendToUI error:", e);
+    console.error("[Plugin] sendToUI error:", e);
   }
 }
 
-// Manual string to bytes conversion
-function stringToUint8Array(str) {
-  const utf8 = unescape(encodeURIComponent(str));
-  const len = utf8.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = utf8.charCodeAt(i);
-  }
-  return bytes;
-}
+penpot.ui.onMessage(async (message) => {
+  if (message.type === "import-website") {
+    const data = message.data;
+    if (!data) return;
 
-// Determine element type from node
-function determineElementType(node) {
-  if (node.tag === "img" || node.src) return "image";
-  if (node.tag === "svg" || node.svgDataUrl) return "svg";
-  if (node.text && node.text.trim()) return "text";
-  return "shape";
-}
-
-// Flatten nested structure into flat elements array
-function flattenStructure(node, elements = [], depth = 0) {
-  if (!node || depth > 50) return elements; // Prevent infinite loops
-
-  // Extract element data
-  const element = {
-    type: determineElementType(node),
-    name: node.id || node.tag || "Element",
-    x: node.geometry?.x || 0,
-    y: node.geometry?.y || 0,
-    width: node.geometry?.width || 100,
-    height: node.geometry?.height || 100,
-    text: node.text || null,
-    src: node.src || null,
-    svgDataUrl: node.svgDataUrl || null,
-    imageUrl: node.src || null,
-    fills: null,
-    fontSize: 16,
-    fontFamily: "Inter",
-    fontWeight: "400",
-    color: "#000000",
-    opacity: 1,
-  };
-
-  // Parse styles if available
-  if (node.styles) {
-    if (
-      node.styles.backgroundColor &&
-      node.styles.backgroundColor !== "rgba(0, 0, 0, 0)"
-    ) {
-      element.fills = [
-        { fillColor: node.styles.backgroundColor, fillOpacity: 1 },
-      ];
-    }
-    if (node.styles.fontSize) {
-      element.fontSize = parseInt(node.styles.fontSize) || 16;
-    }
-    if (node.styles.fontFamily) {
-      element.fontFamily = node.styles.fontFamily
-        .split(",")[0]
-        .replace(/['"]/g, "")
-        .trim();
-    }
-    if (node.styles.fontWeight) {
-      element.fontWeight = node.styles.fontWeight;
-    }
-    if (node.styles.color) {
-      element.color = node.styles.color;
-    }
-    if (node.styles.opacity) {
-      element.opacity = parseFloat(node.styles.opacity) || 1;
+    try {
+      await importWebsite(data);
+      penpot.ui.sendMessage({ type: "import-success" });
+    } catch (error) {
+      penpot.ui.sendMessage({
+        type: "import-error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   }
+});
 
-  // Only add meaningful elements
-  const isVisible = element.opacity > 0.01;
-  const hasContent =
-    element.text ||
+// Check if element should be imported
+function shouldImportElement(element) {
+  return !!(
+    (element.text && element.text.trim().length > 0) ||
+    (element.styles.backgroundColor &&
+      element.styles.backgroundColor !== "rgba(0, 0, 0, 0)") ||
+    (element.styles.backgroundImage &&
+      element.styles.backgroundImage !== "none") ||
+    (element.styles.boxShadow && element.styles.boxShadow !== "none") ||
+    (element.styles.borderRadius &&
+      element.styles.borderRadius !== "0px" &&
+      parseInt(element.styles.borderRadius) > 0) ||
+    [
+      "img",
+      "svg",
+      "button",
+      "a",
+      "input",
+      "textarea",
+      "video",
+      "body",
+      "main",
+      "section",
+      "header",
+      "footer",
+      "nav",
+      "article",
+      "aside",
+    ].includes(element.tag) ||
     element.src ||
     element.svgDataUrl ||
-    (element.fills && element.fills.length > 0);
-  const hasReasonableSize = element.width > 5 && element.height > 5;
+    (element.geometry.width > 300 && element.geometry.height > 300)
+  );
+}
 
-  if (isVisible && (hasContent || hasReasonableSize)) {
-    elements.push(element);
+// Flatten structure
+function flattenElements(data) {
+  const elements = [];
+
+  function traverse(element) {
+    if (!element) return;
+    if (shouldImportElement(element)) {
+      elements.push(element);
+    }
+    if (element.children) {
+      element.children.forEach((child) => traverse(child));
+    }
   }
 
-  // Recurse through children
-  if (node.children && Array.isArray(node.children)) {
-    node.children.forEach((child) =>
-      flattenStructure(child, elements, depth + 1)
-    );
-  }
+  traverse(data.structure.nav);
+  traverse(data.structure.header);
+  traverse(data.structure.main);
+  data.structure.sections?.forEach((section) => traverse(section));
+  traverse(data.structure.footer);
 
   return elements;
 }
 
-// Import image from array data
-async function importImage(imageDataArray, mime, element) {
-  console.log(
-    "[Importer Pro] Importing image:",
-    mime,
-    imageDataArray.length,
-    "bytes"
-  );
+// Calculate board dimensions
+function calculateDimensions(elements) {
+  let maxX = 0,
+    maxY = 0;
+  elements.forEach((el) => {
+    const endX = el.geometry.x + el.geometry.width;
+    const endY = el.geometry.y + el.geometry.height;
+    if (endX > maxX) maxX = endX;
+    if (endY > maxY) maxY = endY;
+  });
+  return {
+    width: Math.max(maxX, 1920),
+    height: Math.max(maxY, 1080),
+  };
+}
 
-  try {
-    const uint8 = new Uint8Array(imageDataArray);
-    const imageMedia = await penpot.uploadMediaData("image", uint8, mime);
+// Color utilities
+function rgbToHex(rgbStr) {
+  const match = rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
+  if (match) {
+    const r = parseInt(match[1]).toString(16).padStart(2, "0");
+    const g = parseInt(match[2]).toString(16).padStart(2, "0");
+    const b = parseInt(match[3]).toString(16).padStart(2, "0");
+    return `#${r}${g}${b}`;
+  }
+  return rgbStr;
+}
 
-    if (!imageMedia || !imageMedia.id) {
-      throw new Error("Image upload failed - no media ID");
+function extractOpacity(rgbaStr) {
+  const match = rgbaStr.match(/rgba\(\d+,\s*\d+,\s*\d+,\s*([\d.]+)\)/);
+  return match ? parseFloat(match[1]) : 1;
+}
+
+// Parse gradient (keeping original logic)
+function parseGradient(backgroundImage) {
+  const linearMatch = backgroundImage.match(/linear-gradient\(([^)]+)\)/);
+  const radialMatch = backgroundImage.match(/radial-gradient\(([^)]+)\)/);
+
+  if (!linearMatch && !radialMatch) return null;
+
+  const isLinear = !!linearMatch;
+  const content = isLinear ? linearMatch[1] : radialMatch[1];
+  const parts = content.split(",").map((p) => p.trim());
+
+  const stops = parts
+    .map((part) => {
+      const colorMatch = part.match(/(rgba?\([^)]+\)|#[0-9a-fA-F]{3,8})/);
+      if (!colorMatch) return null;
+
+      const color = rgbToHex(colorMatch[1]);
+      const opacity = extractOpacity(colorMatch[1]);
+      const offsetMatch = part.match(/(\d+(?:\.\d+)?)%/);
+      const offset = offsetMatch ? parseFloat(offsetMatch[1]) / 100 : null;
+
+      return { color, offset, opacity };
+    })
+    .filter(Boolean);
+
+  if (stops.length === 0) return null;
+
+  if (isLinear) {
+    return {
+      type: "linear",
+      startX: 0,
+      startY: 0,
+      endX: 0,
+      endY: 1,
+      width: 1,
+      stops: stops.map((s) => ({
+        color: s.color,
+        offset: s.offset,
+        opacity: s.opacity,
+      })),
+    };
+  } else {
+    return {
+      type: "radial",
+      startX: 0.5,
+      startY: 0.5,
+      endX: 1,
+      endY: 0.5,
+      width: 1,
+      stops: stops.map((s) => ({
+        color: s.color,
+        offset: s.offset,
+        opacity: s.opacity,
+      })),
+    };
+  }
+}
+
+// Generate element name
+function generateName(element) {
+  if (element.id && element.id.trim().length > 0) return element.id;
+  if (element.text && element.text.length > 0 && element.text.length < 30) {
+    return `${element.tag}: ${element.text.substring(0, 20)}`;
+  }
+  return element.tag;
+}
+
+// Create Penpot element
+async function createElement(element, imageCache = {}) {
+  const zIndex =
+    element.styles.zIndex && element.styles.zIndex !== "auto"
+      ? parseInt(element.styles.zIndex)
+      : 0;
+
+  // Handle images - ENHANCED
+  if (element.tag === "img" && element.src) {
+    console.log("[Image] Processing:", element.src);
+
+    // Check cache
+    if (imageCache[element.src]) {
+      console.log("[Image] Using cached image");
+      const rect = penpot.createRectangle();
+      rect.x = element.geometry.x;
+      rect.y = element.geometry.y;
+      rect.resize(element.geometry.width, element.geometry.height);
+      rect.name = generateName(element);
+      rect.fills = [{ fillOpacity: 1, fillImage: imageCache[element.src] }];
+      return { element: rect, isText: false, zIndex };
     }
 
-    console.log("[Importer Pro] Image uploaded:", imageMedia.id);
+    // Try to fetch and import
+    try {
+      sendToUI("progress", {
+        message: `Fetching image: ${element.src.substring(0, 50)}...`,
+      });
 
+      const imageData = await fetchImageFromUI(element.src);
+      if (imageData && imageData.uint8Array) {
+        const uint8 = new Uint8Array(imageData.uint8Array);
+        const mime = imageData.mime || "image/png";
+
+        const imageMedia = await penpot.uploadMediaData("image", uint8, mime);
+
+        if (imageMedia && imageMedia.id) {
+          imageCache[element.src] = imageMedia;
+
+          const rect = penpot.createRectangle();
+          rect.x = element.geometry.x;
+          rect.y = element.geometry.y;
+          rect.resize(element.geometry.width, element.geometry.height);
+          rect.name = generateName(element);
+          rect.fills = [{ fillOpacity: 1, fillImage: imageMedia }];
+
+          console.log("[Image] ✓ Imported:", element.src);
+          return { element: rect, isText: false, zIndex };
+        }
+      }
+    } catch (err) {
+      console.error("[Image] Failed:", element.src, err);
+    }
+
+    // Fallback to placeholder
     const rect = penpot.createRectangle();
-    rect.x = element.x;
-    rect.y = element.y;
-    rect.resize(element.width, element.height);
-    rect.name = element.name || "Image";
-    rect.fills = [{ fillOpacity: 1, fillImage: imageMedia }];
-
-    return rect;
-  } catch (err) {
-    console.error("[Importer Pro] Image import error:", err);
-    throw err;
+    rect.x = element.geometry.x;
+    rect.y = element.geometry.y;
+    rect.resize(element.geometry.width, element.geometry.height);
+    rect.name = `${generateName(element)} [IMG - Fetch Failed]`;
+    rect.fills = [{ fillColor: "#CCCCCC", fillOpacity: 0.3 }];
+    rect.strokes = [
+      { strokeColor: "#FF6B6B", strokeWidth: 2, strokeOpacity: 0.5 },
+    ];
+    return { element: rect, isText: false, zIndex };
   }
-}
 
-// Import SVG as PNG
-async function importSVG(imageDataArray, element) {
-  console.log(
-    "[Importer Pro] Importing SVG PNG, length:",
-    imageDataArray.length
-  );
+  // Handle SVGs - ENHANCED
+  if (element.tag === "svg" && element.svgDataUrl) {
+    console.log("[SVG] Processing SVG");
 
-  try {
-    const uint8 = new Uint8Array(imageDataArray);
-    const imageMedia = await penpot.uploadMediaData(
-      "image",
-      uint8,
-      "image/png"
-    );
+    try {
+      sendToUI("progress", { message: "Cleaning SVG..." });
 
-    if (!imageMedia || !imageMedia.id) {
-      throw new Error("SVG upload failed - no media ID");
+      // Request UI to clean and convert SVG
+      const svgData = await cleanSVGFromUI(element.svgDataUrl);
+      if (svgData && svgData.uint8Array) {
+        const uint8 = new Uint8Array(svgData.uint8Array);
+        const imageMedia = await penpot.uploadMediaData(
+          "image",
+          uint8,
+          "image/png"
+        );
+
+        if (imageMedia && imageMedia.id) {
+          const rect = penpot.createRectangle();
+          rect.x = element.geometry.x;
+          rect.y = element.geometry.y;
+          rect.resize(element.geometry.width, element.geometry.height);
+          rect.name = generateName(element);
+          rect.fills = [{ fillOpacity: 1, fillImage: imageMedia }];
+
+          console.log("[SVG] ✓ Imported");
+          return { element: rect, isText: false, zIndex };
+        }
+      }
+    } catch (err) {
+      console.error("[SVG] Failed:", err);
     }
 
-    console.log("[Importer Pro] SVG uploaded:", imageMedia.id);
-
+    // Fallback to placeholder
     const rect = penpot.createRectangle();
-    rect.x = element.x;
-    rect.y = element.y;
-    rect.resize(element.width, element.height);
-    rect.name = element.name || "SVG";
-    rect.fills = [{ fillOpacity: 1, fillImage: imageMedia }];
-
-    return rect;
-  } catch (err) {
-    console.error("[Importer Pro] SVG import error:", err);
-    throw err;
+    rect.x = element.geometry.x;
+    rect.y = element.geometry.y;
+    rect.resize(element.geometry.width, element.geometry.height);
+    rect.name = `${generateName(element)} [SVG - Clean Failed]`;
+    rect.fills = [{ fillColor: "#FFFFFF", fillOpacity: 0.05 }];
+    rect.strokes = [
+      { strokeColor: "#22D3EE", strokeWidth: 1, strokeOpacity: 0.2 },
+    ];
+    return { element: rect, isText: false, zIndex };
   }
-}
 
-// Import text element
-function importText(element) {
-  try {
-    const text = penpot.createText(element.text || "Text");
-    text.x = element.x;
-    text.y = element.y;
-    text.resize(element.width, element.height);
-    text.name = element.name || "Text";
+  // Handle text (original logic)
+  if (element.text && element.text.trim().length > 0) {
+    const text = penpot.createText(element.text);
+    text.x = element.geometry.x;
+    text.y = element.geometry.y;
+    text.resize(element.geometry.width, element.geometry.height);
+    text.name = generateName(element);
 
-    if (element.fontSize) text.fontSize = element.fontSize;
-    if (element.fontFamily) text.fontFamily = element.fontFamily;
-    if (element.fontWeight) text.fontWeight = element.fontWeight;
-    if (element.color) {
-      text.fills = [
-        { fillColor: element.color, fillOpacity: element.opacity || 1 },
-      ];
+    const fontSize = parseInt(element.styles.fontSize);
+    if (!isNaN(fontSize) && fontSize > 0) text.fontSize = fontSize.toString();
+
+    try {
+      text.fontFamily =
+        element.styles.fontFamily.split(",")[0].replace(/["']/g, "").trim() ||
+        "Work Sans";
+    } catch {
+      text.fontFamily = "Work Sans";
     }
 
-    return text;
-  } catch (err) {
-    console.error("[Importer Pro] Text creation error:", err);
-    return null;
+    const color = rgbToHex(element.styles.color);
+    const opacity = extractOpacity(element.styles.color);
+    text.fills = [{ fillColor: color, fillOpacity: opacity }];
+
+    return { element: text, isText: true, zIndex };
   }
+
+  // Handle shapes (original logic with gradients)
+  const rect = penpot.createRectangle();
+  rect.x = element.geometry.x;
+  rect.y = element.geometry.y;
+  rect.resize(element.geometry.width, element.geometry.height);
+  rect.name = generateName(element);
+
+  if (
+    element.styles.backgroundImage &&
+    element.styles.backgroundImage.includes("gradient")
+  ) {
+    const gradient = parseGradient(element.styles.backgroundImage);
+    if (gradient) {
+      rect.fills = [{ fillColorGradient: gradient }];
+      return { element: rect, isText: false, zIndex };
+    }
+  }
+
+  if (
+    element.styles.backgroundColor &&
+    element.styles.backgroundColor !== "rgba(0, 0, 0, 0)"
+  ) {
+    const color = rgbToHex(element.styles.backgroundColor);
+    const opacity = extractOpacity(element.styles.backgroundColor);
+    rect.fills = [{ fillColor: color, fillOpacity: opacity }];
+  }
+
+  if (element.styles.borderRadius && element.styles.borderRadius !== "0px") {
+    const radius = parseInt(element.styles.borderRadius);
+    if (!isNaN(radius) && radius > 0) rect.borderRadius = radius;
+  }
+
+  return { element: rect, isText: false, zIndex };
 }
 
-// Import rectangle/shape
-function importShape(element) {
-  try {
-    const rect = penpot.createRectangle();
-    rect.x = element.x;
-    rect.y = element.y;
-    rect.resize(element.width, element.height);
-    rect.name = element.name || "Shape";
+// Request image from UI
+async function fetchImageFromUI(url) {
+  return new Promise((resolve) => {
+    const messageHandler = (event) => {
+      if (event.data && event.data.type === "image-fetched") {
+        penpot.ui.removeEventListener("message", messageHandler);
+        resolve(event.data.data);
+      }
+    };
 
-    if (element.fills && element.fills.length > 0) {
-      rect.fills = element.fills;
-    }
-    if (element.borderRadius) {
-      rect.borderRadius = element.borderRadius;
-    }
+    penpot.ui.addEventListener("message", messageHandler);
+    sendToUI("fetch-image", { url });
 
-    return rect;
-  } catch (err) {
-    console.error("[Importer Pro] Shape creation error:", err);
-    return null;
-  }
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      penpot.ui.removeEventListener("message", messageHandler);
+      resolve(null);
+    }, 10000);
+  });
 }
 
-// Main import handler
+// Request SVG cleaning from UI
+async function cleanSVGFromUI(svgDataUrl) {
+  return new Promise((resolve) => {
+    const messageHandler = (event) => {
+      if (event.data && event.data.type === "svg-cleaned") {
+        penpot.ui.removeEventListener("message", messageHandler);
+        resolve(event.data.data);
+      }
+    };
+
+    penpot.ui.addEventListener("message", messageHandler);
+    sendToUI("clean-svg", { svgDataUrl });
+
+    setTimeout(() => {
+      penpot.ui.removeEventListener("message", messageHandler);
+      resolve(null);
+    }, 10000);
+  });
+}
+
+// Main import function
 async function importWebsite(data) {
-  console.log("[Importer Pro] Starting import...", data);
+  if (!penpot.currentPage) throw new Error("No active page found");
 
-  if (!penpot.currentPage) {
-    throw new Error("No active page found");
-  }
-
-  sendToUI("progress", { message: "Processing structure...", percent: 0 });
-
-  // Flatten nested structure if needed
-  let elements = data.elements;
-  if (!elements && data.structure) {
-    console.log("[Importer Pro] Flattening nested structure...");
-    elements = flattenStructure(data.structure);
-    console.log("[Importer Pro] Flattened to", elements.length, "elements");
-  }
-
-  if (!elements || elements.length === 0) {
-    throw new Error("No elements found in data");
-  }
-
-  sendToUI("progress", { message: "Creating board...", percent: 5 });
+  const elements = flattenElements(data);
+  const dimensions = calculateDimensions(elements);
 
   const board = penpot.createBoard();
-  board.name = data.metadata?.title || "Imported Website";
-
-  const width = data.metadata?.viewport?.width || data.metadata?.width || 1920;
-  const height =
-    data.metadata?.viewport?.height || data.metadata?.height || 1080;
-
-  board.resize(width, height);
+  board.name = data.metadata.title || "Imported Website";
+  board.resize(dimensions.width, dimensions.height);
   board.x = 0;
   board.y = 0;
-  board.fills = [{ fillColor: "#ffffff", fillOpacity: 1 }];
+  board.fills = [{ fillColor: "#09090b", fillOpacity: 1 }];
 
-  const total = elements.length;
-  let completed = 0;
-  let imported = 0;
+  const created = [];
+  const imageCache = {};
+  const batchSize = 50;
 
-  console.log("[Importer Pro] Processing", total, "elements");
+  // Process in batches
+  for (let i = 0; i < elements.length; i += batchSize) {
+    const batch = elements.slice(i, i + batchSize);
 
-  for (const element of elements) {
-    try {
-      let shape = null;
-
-      if (element.type === "image" && element.imageData) {
-        sendToUI("progress", {
-          message: `Image: ${element.name}`,
-          percent: 10 + (completed / total) * 85,
-        });
-        shape = await importImage(element.imageData, element.mime, element);
-      } else if (element.type === "svg" && element.svgData) {
-        sendToUI("progress", {
-          message: `SVG: ${element.name}`,
-          percent: 10 + (completed / total) * 85,
-        });
-        shape = await importSVG(element.svgData, element);
-      } else if (element.type === "text" && element.text) {
-        sendToUI("progress", {
-          message: `Text: ${element.name}`,
-          percent: 10 + (completed / total) * 85,
-        });
-        shape = importText(element);
-      } else if (element.type === "shape" && element.fills) {
-        shape = importShape(element);
+    for (const element of batch) {
+      try {
+        const result = await createElement(element, imageCache);
+        if (result) created.push({ ...result, sourceElement: element });
+      } catch (err) {
+        console.error("[Import] Failed:", element.id, err);
       }
-
-      if (shape) {
-        board.appendChild(shape);
-        imported++;
-      }
-
-      completed++;
-
-      // Log progress every 50 elements
-      if (completed % 50 === 0) {
-        console.log(
-          "[Importer Pro] Progress:",
-          completed,
-          "/",
-          total,
-          "imported:",
-          imported
-        );
-      }
-    } catch (err) {
-      console.error("[Importer Pro] Element failed:", element.name, err);
     }
+
+    sendToUI("progress", {
+      message: `Processing ${i + batch.length} / ${elements.length}...`,
+      percent: ((i + batch.length) / elements.length) * 100,
+    });
   }
 
-  console.log("[Importer Pro] Import complete:", imported, "elements created");
+  // Sort by z-index and size (original logic)
+  created.sort((a, b) => {
+    if (a.isText !== b.isText) return a.isText ? 1 : -1;
+    if (!a.isText && !b.isText) {
+      const aSize =
+        a.sourceElement.geometry.width * a.sourceElement.geometry.height;
+      const bSize =
+        b.sourceElement.geometry.width * b.sourceElement.geometry.height;
+      const fullSize = 1920 * 1080;
+      const aIsLarge = aSize > fullSize * 0.5;
+      const bIsLarge = bSize > fullSize * 0.5;
 
-  penpot.selection = [board];
-  sendToUI("progress", {
-    message: `Complete! ${imported} elements imported`,
-    percent: 100,
+      if (aIsLarge && !bIsLarge) return -1;
+      if (bIsLarge && !aIsLarge) return 1;
+      if (Math.abs(aSize - bSize) > 100000) return aSize - bSize;
+    }
+    return a.zIndex - b.zIndex;
   });
-  sendToUI("import-success", { imported: imported, total: total });
+
+  created.forEach((item) => board.appendChild(item.element));
+  penpot.selection = [board];
+
+  console.log(`[Import] Complete: ${created.length} elements created`);
 }
-
-// Message handler
-penpot.ui.onMessage(async (message) => {
-  const msg = message.pluginMessage || message;
-
-  console.log("[Importer Pro] Received message type:", msg.type);
-
-  if (msg.type === "import-website") {
-    try {
-      await importWebsite(msg.data);
-    } catch (err) {
-      console.error("[Importer Pro] Import error:", err);
-      sendToUI("import-error", { error: err.message });
-    }
-  } else if (msg.type === "import-image") {
-    try {
-      await importImage(msg.imageData, msg.mime, msg.element);
-      sendToUI("import-success", {});
-    } catch (err) {
-      sendToUI("import-error", { error: err.message });
-    }
-  } else if (msg.type === "import-svg") {
-    try {
-      await importSVG(msg.svgData, msg.element);
-      sendToUI("import-success", {});
-    } catch (err) {
-      sendToUI("import-error", { error: err.message });
-    }
-  }
-});
-
-console.log("[Importer Pro] Ready");
