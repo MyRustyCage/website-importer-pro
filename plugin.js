@@ -28,6 +28,91 @@ function stringToUint8Array(str) {
   return bytes;
 }
 
+// Determine element type from node
+function determineElementType(node) {
+  if (node.tag === "img" || node.src) return "image";
+  if (node.tag === "svg" || node.svgDataUrl) return "svg";
+  if (node.text && node.text.trim()) return "text";
+  return "shape";
+}
+
+// Flatten nested structure into flat elements array
+function flattenStructure(node, elements = [], depth = 0) {
+  if (!node || depth > 50) return elements; // Prevent infinite loops
+
+  // Extract element data
+  const element = {
+    type: determineElementType(node),
+    name: node.id || node.tag || "Element",
+    x: node.geometry?.x || 0,
+    y: node.geometry?.y || 0,
+    width: node.geometry?.width || 100,
+    height: node.geometry?.height || 100,
+    text: node.text || null,
+    src: node.src || null,
+    svgDataUrl: node.svgDataUrl || null,
+    imageUrl: node.src || null,
+    fills: null,
+    fontSize: 16,
+    fontFamily: "Inter",
+    fontWeight: "400",
+    color: "#000000",
+    opacity: 1,
+  };
+
+  // Parse styles if available
+  if (node.styles) {
+    if (
+      node.styles.backgroundColor &&
+      node.styles.backgroundColor !== "rgba(0, 0, 0, 0)"
+    ) {
+      element.fills = [
+        { fillColor: node.styles.backgroundColor, fillOpacity: 1 },
+      ];
+    }
+    if (node.styles.fontSize) {
+      element.fontSize = parseInt(node.styles.fontSize) || 16;
+    }
+    if (node.styles.fontFamily) {
+      element.fontFamily = node.styles.fontFamily
+        .split(",")[0]
+        .replace(/['"]/g, "")
+        .trim();
+    }
+    if (node.styles.fontWeight) {
+      element.fontWeight = node.styles.fontWeight;
+    }
+    if (node.styles.color) {
+      element.color = node.styles.color;
+    }
+    if (node.styles.opacity) {
+      element.opacity = parseFloat(node.styles.opacity) || 1;
+    }
+  }
+
+  // Only add meaningful elements
+  const isVisible = element.opacity > 0.01;
+  const hasContent =
+    element.text ||
+    element.src ||
+    element.svgDataUrl ||
+    (element.fills && element.fills.length > 0);
+  const hasReasonableSize = element.width > 5 && element.height > 5;
+
+  if (isVisible && (hasContent || hasReasonableSize)) {
+    elements.push(element);
+  }
+
+  // Recurse through children
+  if (node.children && Array.isArray(node.children)) {
+    node.children.forEach((child) =>
+      flattenStructure(child, elements, depth + 1)
+    );
+  }
+
+  return elements;
+}
+
 // Import image from array data
 async function importImage(imageDataArray, mime, element) {
   console.log(
@@ -98,35 +183,50 @@ async function importSVG(imageDataArray, element) {
 
 // Import text element
 function importText(element) {
-  const text = penpot.createText(element.text || "Text");
-  text.x = element.x;
-  text.y = element.y;
-  text.resize(element.width, element.height);
-  text.name = element.name || "Text";
+  try {
+    const text = penpot.createText(element.text || "Text");
+    text.x = element.x;
+    text.y = element.y;
+    text.resize(element.width, element.height);
+    text.name = element.name || "Text";
 
-  if (element.fontSize) text.fontSize = element.fontSize;
-  if (element.fontFamily) text.fontFamily = element.fontFamily;
-  if (element.fontWeight) text.fontWeight = element.fontWeight;
-  if (element.color)
-    text.fills = [
-      { fillColor: element.color, fillOpacity: element.opacity || 1 },
-    ];
+    if (element.fontSize) text.fontSize = element.fontSize;
+    if (element.fontFamily) text.fontFamily = element.fontFamily;
+    if (element.fontWeight) text.fontWeight = element.fontWeight;
+    if (element.color) {
+      text.fills = [
+        { fillColor: element.color, fillOpacity: element.opacity || 1 },
+      ];
+    }
 
-  return text;
+    return text;
+  } catch (err) {
+    console.error("[Importer Pro] Text creation error:", err);
+    return null;
+  }
 }
 
 // Import rectangle/shape
 function importShape(element) {
-  const rect = penpot.createRectangle();
-  rect.x = element.x;
-  rect.y = element.y;
-  rect.resize(element.width, element.height);
-  rect.name = element.name || "Shape";
+  try {
+    const rect = penpot.createRectangle();
+    rect.x = element.x;
+    rect.y = element.y;
+    rect.resize(element.width, element.height);
+    rect.name = element.name || "Shape";
 
-  if (element.fills) rect.fills = element.fills;
-  if (element.borderRadius) rect.borderRadius = element.borderRadius;
+    if (element.fills && element.fills.length > 0) {
+      rect.fills = element.fills;
+    }
+    if (element.borderRadius) {
+      rect.borderRadius = element.borderRadius;
+    }
 
-  return rect;
+    return rect;
+  } catch (err) {
+    console.error("[Importer Pro] Shape creation error:", err);
+    return null;
+  }
 }
 
 // Main import handler
@@ -137,18 +237,39 @@ async function importWebsite(data) {
     throw new Error("No active page found");
   }
 
-  sendToUI("progress", { message: "Creating board...", percent: 0 });
+  sendToUI("progress", { message: "Processing structure...", percent: 0 });
+
+  // Flatten nested structure if needed
+  let elements = data.elements;
+  if (!elements && data.structure) {
+    console.log("[Importer Pro] Flattening nested structure...");
+    elements = flattenStructure(data.structure);
+    console.log("[Importer Pro] Flattened to", elements.length, "elements");
+  }
+
+  if (!elements || elements.length === 0) {
+    throw new Error("No elements found in data");
+  }
+
+  sendToUI("progress", { message: "Creating board...", percent: 5 });
 
   const board = penpot.createBoard();
   board.name = data.metadata?.title || "Imported Website";
-  board.resize(data.metadata?.width || 1920, data.metadata?.height || 1080);
+
+  const width = data.metadata?.viewport?.width || data.metadata?.width || 1920;
+  const height =
+    data.metadata?.viewport?.height || data.metadata?.height || 1080;
+
+  board.resize(width, height);
   board.x = 0;
   board.y = 0;
-  board.fills = [{ fillColor: "#09090b", fillOpacity: 1 }];
+  board.fills = [{ fillColor: "#ffffff", fillOpacity: 1 }];
 
-  const elements = data.elements || [];
   const total = elements.length;
   let completed = 0;
+  let imported = 0;
+
+  console.log("[Importer Pro] Processing", total, "elements");
 
   for (const element of elements) {
     try {
@@ -156,48 +277,61 @@ async function importWebsite(data) {
 
       if (element.type === "image" && element.imageData) {
         sendToUI("progress", {
-          message: `Importing image: ${element.name}`,
-          percent: (completed / total) * 100,
+          message: `Image: ${element.name}`,
+          percent: 10 + (completed / total) * 85,
         });
         shape = await importImage(element.imageData, element.mime, element);
       } else if (element.type === "svg" && element.svgData) {
         sendToUI("progress", {
-          message: `Importing SVG: ${element.name}`,
-          percent: (completed / total) * 100,
+          message: `SVG: ${element.name}`,
+          percent: 10 + (completed / total) * 85,
         });
         shape = await importSVG(element.svgData, element);
-      } else if (element.type === "text") {
+      } else if (element.type === "text" && element.text) {
         sendToUI("progress", {
-          message: `Creating text: ${element.name}`,
-          percent: (completed / total) * 100,
+          message: `Text: ${element.name}`,
+          percent: 10 + (completed / total) * 85,
         });
         shape = importText(element);
-      } else {
-        sendToUI("progress", {
-          message: `Creating shape: ${element.name}`,
-          percent: (completed / total) * 100,
-        });
+      } else if (element.type === "shape" && element.fills) {
         shape = importShape(element);
       }
 
       if (shape) {
         board.appendChild(shape);
+        imported++;
       }
 
       completed++;
+
+      // Log progress every 50 elements
+      if (completed % 50 === 0) {
+        console.log(
+          "[Importer Pro] Progress:",
+          completed,
+          "/",
+          total,
+          "imported:",
+          imported
+        );
+      }
     } catch (err) {
-      console.error("[Importer Pro] Element import failed:", element.name, err);
+      console.error("[Importer Pro] Element failed:", element.name, err);
     }
   }
 
+  console.log("[Importer Pro] Import complete:", imported, "elements created");
+
   penpot.selection = [board];
-  sendToUI("progress", { message: "Import complete!", percent: 100 });
-  sendToUI("import-success", {});
+  sendToUI("progress", {
+    message: `Complete! ${imported} elements imported`,
+    percent: 100,
+  });
+  sendToUI("import-success", { imported: imported, total: total });
 }
 
-// Message handler - FIXED
+// Message handler
 penpot.ui.onMessage(async (message) => {
-  // The message structure from parent.postMessage
   const msg = message.pluginMessage || message;
 
   console.log("[Importer Pro] Received message type:", msg.type);
