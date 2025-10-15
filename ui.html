@@ -17,7 +17,7 @@
         min-height: 100vh;
       }
       .container {
-        max-width: 460px;
+        max-width: 500px;
         margin: 0 auto;
         background: white;
         border-radius: 12px;
@@ -110,7 +110,7 @@
         color: #742a2a;
         border-left: 4px solid #e53e3e;
       }
-      .progress {
+      .processing {
         background: #fefcbf;
         color: #744210;
         border-left: 4px solid #d69e2e;
@@ -139,6 +139,28 @@
       .file-info strong {
         color: #1a202c;
       }
+      .stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .stat {
+        background: #f7fafc;
+        padding: 8px;
+        border-radius: 4px;
+        text-align: center;
+      }
+      .stat-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: #667eea;
+      }
+      .stat-label {
+        font-size: 11px;
+        color: #718096;
+        text-transform: uppercase;
+      }
     </style>
   </head>
   <body>
@@ -154,8 +176,17 @@
       <input type="file" id="file-input" accept=".json" />
 
       <div id="file-info" class="file-info" style="display: none">
-        <strong>File:</strong> <span id="file-name"></span><br />
-        <strong>Elements:</strong> <span id="element-count">0</span>
+        <strong>File:</strong> <span id="file-name"></span>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-value" id="element-count">0</div>
+            <div class="stat-label">Elements</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="media-count">0</div>
+            <div class="stat-label">Media</div>
+          </div>
+        </div>
       </div>
 
       <button id="import-btn" disabled>Import to Penpot</button>
@@ -171,13 +202,12 @@
       const fileInfo = document.getElementById("file-info");
       const fileName = document.getElementById("file-name");
       const elementCount = document.getElementById("element-count");
+      const mediaCount = document.getElementById("media-count");
       const importBtn = document.getElementById("import-btn");
       const statusEl = document.getElementById("status");
 
-      // Upload area click
       uploadArea.addEventListener("click", () => fileInput.click());
 
-      // Drag and drop
       uploadArea.addEventListener("dragover", (e) => {
         e.preventDefault();
         uploadArea.style.borderColor = "#667eea";
@@ -194,12 +224,27 @@
         if (files.length > 0) handleFile(files[0]);
       });
 
-      // File input change
       fileInput.addEventListener("change", (e) => {
         if (e.target.files.length > 0) handleFile(e.target.files[0]);
       });
 
-      // Handle file upload
+      function setStatus(message, type = "info") {
+        statusEl.textContent = message;
+        statusEl.className = type;
+        statusEl.style.display = "block";
+      }
+
+      function setProgress(message, percent) {
+        statusEl.innerHTML = `
+          ${message}
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: ${percent}%"></div>
+          </div>
+        `;
+        statusEl.className = "processing";
+        statusEl.style.display = "block";
+      }
+
       async function handleFile(file) {
         if (!file.name.endsWith(".json")) {
           setStatus("Please upload a JSON file", "error");
@@ -212,31 +257,38 @@
 
           currentData = data;
 
-          // Count elements
-          const count = countElements(data);
+          // Count elements and media
+          const stats = analyzeData(data);
 
-          // Update UI
           uploadArea.classList.add("active");
           uploadArea.querySelector(".upload-text").textContent =
             "✓ File loaded";
           fileName.textContent = file.name;
-          elementCount.textContent = count;
+          elementCount.textContent = stats.elements;
+          mediaCount.textContent = stats.images + stats.svgs;
           fileInfo.style.display = "block";
           importBtn.disabled = false;
 
-          setStatus(`Ready! ${count} elements found`, "success");
+          setStatus(
+            `Ready! ${stats.elements} elements, ${stats.images} images, ${stats.svgs} SVGs`,
+            "success"
+          );
         } catch (err) {
           setStatus("Invalid JSON file: " + err.message, "error");
           importBtn.disabled = true;
         }
       }
 
-      // Count elements in structure
-      function countElements(data) {
-        let count = 0;
+      function analyzeData(data) {
+        let elements = 0,
+          images = 0,
+          svgs = 0;
+
         function traverse(node) {
           if (!node) return;
-          count++;
+          elements++;
+          if (node.tag === "img" || node.src) images++;
+          if (node.tag === "svg" || node.svgDataUrl) svgs++;
           if (node.children) node.children.forEach(traverse);
         }
 
@@ -248,60 +300,23 @@
           traverse(data.structure.footer);
         }
 
-        return count;
+        return { elements, images, svgs };
       }
-
-      // Set status message
-      function setStatus(message, type = "info") {
-        statusEl.textContent = message;
-        statusEl.className = type;
-        statusEl.style.display = "block";
-      }
-
-      // Set progress
-      function setProgress(message, percent) {
-        statusEl.innerHTML = `
-          ${message}
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: ${percent}%"></div>
-          </div>
-        `;
-        statusEl.className = "progress";
-        statusEl.style.display = "block";
-      }
-
-      // Import button click
-      importBtn.addEventListener("click", () => {
-        if (!currentData) return;
-
-        setStatus("Starting import...", "info");
-        importBtn.disabled = true;
-
-        parent.postMessage(
-          {
-            type: "import-website",
-            data: currentData,
-          },
-          "*"
-        );
-      });
 
       // ========================================
-      // IMAGE FETCHER (with CORS proxy)
+      // FETCH IMAGES WITH CORS PROXY
       // ========================================
 
       async function fetchImage(url) {
-        console.log("[UI] Fetching image:", url);
+        console.log("[UI] Fetching:", url);
 
         try {
-          // Try direct fetch first
           const response = await fetch(url, { mode: "cors" });
           if (response.ok) return response;
         } catch (e) {
-          console.log("[UI] Direct fetch failed, trying proxy...");
+          console.log("[UI] Direct failed, trying proxy...");
         }
 
-        // Try CORS proxies
         const proxies = [
           `https://corsproxy.io/?${encodeURIComponent(url)}`,
           `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
@@ -320,7 +335,7 @@
       }
 
       // ========================================
-      // SVG CLEANER (from our svg-cleaner plugin)
+      // CLEAN SVG (simplified version)
       // ========================================
 
       function cleanSVG(svgString) {
@@ -328,44 +343,22 @@
         const doc = parser.parseFromString(svgString, "image/svg+xml");
         const svg = doc.documentElement;
 
-        function parseTailwindColor(colorName) {
-          const colors = {
-            red: "#ef4444",
-            blue: "#3b82f6",
-            green: "#22c55e",
-            white: "#ffffff",
-            black: "#000000",
-            gray: "#6b7280",
-          };
-          return colors[colorName] || colorName;
-        }
-
-        function extractMaskFromClass(classStr) {
-          if (!classStr) return null;
-          const match = classStr.match(/\[mask-image:([^\]]+)\]/);
-          return match ? match[1] : null;
-        }
-
-        // Add mask conversion functions here (keeping it short for length)
-        // ... (same as before)
-
-        const classAttr = svg.getAttribute("class");
-        const styleAttr = svg.getAttribute("style");
-
         if (!svg.getAttribute("width")) svg.setAttribute("width", "800");
         if (!svg.getAttribute("height")) svg.setAttribute("height", "600");
         svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
 
         svg.removeAttribute("class");
         svg.removeAttribute("style");
-        svg.removeAttribute("aria-hidden");
+
+        svg.querySelectorAll("*").forEach((el) => {
+          el.removeAttribute("class");
+          el.removeAttribute("style");
+        });
 
         const serializer = new XMLSerializer();
         let result = serializer.serializeToString(svg);
 
-        if (
-          !result.match(/<svg[^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)
-        ) {
+        if (!result.includes('xmlns="http://www.w3.org/2000/svg"')) {
           result = result.replace(
             /<svg\s/,
             '<svg xmlns="http://www.w3.org/2000/svg" '
@@ -406,8 +399,7 @@
             ctx.drawImage(img, 0, 0, width, height);
             canvas.toBlob(async (pngBlob) => {
               const arrayBuffer = await pngBlob.arrayBuffer();
-              const uint8Array = new Uint8Array(arrayBuffer);
-              resolve({ uint8Array: Array.from(uint8Array), width, height });
+              resolve(Array.from(new Uint8Array(arrayBuffer)));
             }, "image/png");
           };
 
@@ -417,91 +409,145 @@
       }
 
       // ========================================
-      // MESSAGE LISTENER (from plugin)
+      // PROCESS ALL MEDIA BEFORE IMPORT
       // ========================================
 
-      window.addEventListener("message", async (event) => {
-        const msg = event.data;
+      async function processMediaInStructure(structure) {
+        let processed = 0;
+        let total = 0;
+
+        // Count total media
+        function countMedia(node) {
+          if (!node) return;
+          if (node.src || node.svgDataUrl) total++;
+          if (node.children) node.children.forEach(countMedia);
+        }
+
+        for (const key in structure) {
+          if (structure[key]) countMedia(structure[key]);
+        }
+
+        // Process media recursively
+        async function processNode(node) {
+          if (!node) return;
+
+          // Process image
+          if (node.src && !node.imageData) {
+            try {
+              setProgress(
+                `Fetching image ${processed + 1}/${total}...`,
+                (processed / total) * 50
+              );
+
+              const response = await fetchImage(node.src);
+              const arrayBuffer = await response.arrayBuffer();
+              const uint8Array = new Uint8Array(arrayBuffer);
+
+              node.imageData = Array.from(uint8Array);
+
+              // Detect MIME
+              node.mime = "image/png";
+              if (uint8Array[0] === 0xff && uint8Array[1] === 0xd8)
+                node.mime = "image/jpeg";
+              else if (uint8Array[0] === 0x89 && uint8Array[1] === 0x50)
+                node.mime = "image/png";
+              else if (uint8Array[0] === 0x47 && uint8Array[1] === 0x49)
+                node.mime = "image/gif";
+
+              console.log("[UI] ✓ Fetched:", node.src);
+              processed++;
+            } catch (err) {
+              console.error("[UI] Image fetch failed:", node.src, err);
+              processed++;
+            }
+          }
+
+          // Process SVG
+          if (node.svgDataUrl && !node.svgData) {
+            try {
+              setProgress(
+                `Cleaning SVG ${processed + 1}/${total}...`,
+                50 + (processed / total) * 50
+              );
+
+              const svgString = atob(node.svgDataUrl.split(",")[1]);
+              const cleaned = cleanSVG(svgString);
+              const pngData = await convertSVGtoPNG(cleaned);
+
+              node.svgData = pngData;
+
+              console.log("[UI] ✓ Cleaned SVG");
+              processed++;
+            } catch (err) {
+              console.error("[UI] SVG clean failed:", err);
+              processed++;
+            }
+          }
+
+          // Recurse
+          if (node.children) {
+            for (const child of node.children) {
+              await processNode(child);
+            }
+          }
+        }
+
+        // Process all sections
+        for (const key in structure) {
+          if (structure[key]) {
+            await processNode(structure[key]);
+          }
+        }
+
+        return { processed, total };
+      }
+
+      // ========================================
+      // IMPORT BUTTON
+      // ========================================
+
+      importBtn.addEventListener("click", async () => {
+        if (!currentData) return;
+
+        importBtn.disabled = true;
+        setStatus("Processing media...", "processing");
+
+        try {
+          // Process all images and SVGs
+          const stats = await processMediaInStructure(currentData.structure);
+
+          setProgress("Sending to Penpot...", 100);
+
+          // Send complete data to plugin
+          parent.postMessage(
+            {
+              pluginMessage: {
+                type: "import-website",
+                data: currentData,
+              },
+            },
+            "*"
+          );
+        } catch (err) {
+          setStatus("Failed: " + err.message, "error");
+          importBtn.disabled = false;
+        }
+      });
+
+      // Listen for plugin responses
+      window.addEventListener("message", (event) => {
+        const msg = event.data && event.data.pluginMessage;
         if (!msg) return;
 
-        // Handle progress updates
         if (msg.type === "progress") {
           if (msg.percent !== undefined) {
-            setProgress(msg.message || "Processing...", msg.percent);
-          } else {
-            setStatus(msg.message || "Processing...", "info");
+            setProgress(msg.message || "Importing...", msg.percent);
           }
-        }
-
-        // Handle image fetch request
-        else if (msg.type === "fetch-image") {
-          try {
-            console.log("[UI] Fetching image:", msg.url);
-            const response = await fetchImage(msg.url);
-            const arrayBuffer = await response.arrayBuffer();
-            const uint8Array = new Uint8Array(arrayBuffer);
-
-            // Detect MIME type
-            let mime = "image/png";
-            if (uint8Array[0] === 0xff && uint8Array[1] === 0xd8)
-              mime = "image/jpeg";
-            else if (uint8Array[0] === 0x89 && uint8Array[1] === 0x50)
-              mime = "image/png";
-            else if (uint8Array[0] === 0x47 && uint8Array[1] === 0x49)
-              mime = "image/gif";
-
-            parent.postMessage(
-              {
-                type: "image-fetched",
-                data: {
-                  uint8Array: Array.from(uint8Array),
-                  mime: mime,
-                },
-              },
-              "*"
-            );
-          } catch (err) {
-            console.error("[UI] Image fetch failed:", err);
-            parent.postMessage(
-              {
-                type: "image-fetched",
-                data: null,
-              },
-              "*"
-            );
-          }
-        }
-
-        // Handle SVG clean request
-        else if (msg.type === "clean-svg") {
-          try {
-            console.log("[UI] Cleaning SVG...");
-            const svgString = atob(msg.svgDataUrl.split(",")[1]);
-            const cleaned = cleanSVG(svgString);
-            const pngData = await convertSVGtoPNG(cleaned);
-
-            parent.postMessage(
-              {
-                type: "svg-cleaned",
-                data: pngData,
-              },
-              "*"
-            );
-          } catch (err) {
-            console.error("[UI] SVG clean failed:", err);
-            parent.postMessage(
-              {
-                type: "svg-cleaned",
-                data: null,
-              },
-              "*"
-            );
-          }
-        }
-
-        // Handle success/error
-        else if (msg.type === "import-success") {
-          setStatus("✅ Import complete!", "success");
+        } else if (msg.type === "import-success") {
+          setStatus(
+            `✅ Complete! ${msg.imported || 0} elements imported`,
+            "success"
+          );
           importBtn.disabled = false;
         } else if (msg.type === "import-error") {
           setStatus("❌ " + msg.error, "error");
