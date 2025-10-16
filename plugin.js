@@ -1,4 +1,4 @@
-// plugin.js - Website Importer Pro - Optimized with pre-rendered images
+// plugin.js - Website Importer Pro - Final version with SVG pre-rendering support
 
 console.log("[Importer Pro] Loading...");
 
@@ -59,10 +59,13 @@ function normalizeFontWeight(weight) {
 }
 
 function determineElementType(node) {
-  // Check for pre-rendered image data first
+  // Check for pre-rendered image data first (SVG-in-container)
   if (node.imageDataUrl) return "image";
+  // Check for regular images
   if (node.tag === "img" || node.src) return "image";
+  // Check for SVG
   if (node.tag === "svg" || node.svgDataUrl) return "svg";
+  // Check for text
   if (node.text && node.text.trim()) return "text";
   return "shape";
 }
@@ -93,7 +96,7 @@ function flattenNode(node, elements, depth) {
     text: node.text || null,
     src: node.src || null,
     svgDataUrl: node.svgDataUrl || null,
-    imageDataUrl: node.imageDataUrl || null, // Pre-rendered image
+    imageDataUrl: node.imageDataUrl || null, // Pre-rendered images
     imageData: node.imageData || null,
     svgData: node.svgData || null,
     mime: node.mime || "image/png",
@@ -371,26 +374,44 @@ async function importWebsite(data) {
     try {
       let shape = null;
 
-      if (element.type === "image" && element.imageData) {
+      // Handle pre-rendered images (SVG-in-container rendered to PNG)
+      if (element.imageDataUrl && element.imageData) {
+        sendToUI("progress", {
+          message: `Importing pre-rendered image: ${element.name}`,
+          percent: 10 + (completed / total) * 85,
+        });
+        shape = await importImage(element.imageData, element.mime, element);
+      }
+      // Handle regular images
+      else if (element.type === "image" && element.imageData) {
         sendToUI("progress", {
           message: `Importing image: ${element.name}`,
           percent: 10 + (completed / total) * 85,
         });
         shape = await importImage(element.imageData, element.mime, element);
-      } else if (element.type === "svg" && element.svgData) {
+      }
+      // Handle SVG (both standalone and those with svgData)
+      else if (
+        (element.type === "svg" || element.svgDataUrl) &&
+        element.svgData
+      ) {
         sendToUI("progress", {
           message: `Importing SVG: ${element.name}`,
           percent: 10 + (completed / total) * 85,
         });
         shape = await importSVG(element.svgData, element);
-      } else if (element.type === "text" && element.text) {
+      }
+      // Handle text
+      else if (element.type === "text" && element.text) {
         sendToUI("progress", {
           message: `Creating text: ${element.name}`,
           percent: 10 + (completed / total) * 85,
         });
         shape = importText(element);
         if (shape) textCount++;
-      } else if (element.type === "shape" && element.fills) {
+      }
+      // Handle shapes
+      else if (element.type === "shape" && element.fills) {
         shape = importShape(element);
       }
 
