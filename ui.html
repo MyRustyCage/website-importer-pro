@@ -81,117 +81,86 @@
       }
       button:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
       }
       button:disabled {
-        background: #cbd5e0;
+        opacity: 0.5;
         cursor: not-allowed;
-        transform: none;
-      }
-      #status {
-        padding: 12px;
-        border-radius: 8px;
-        font-size: 13px;
-        margin-top: 16px;
-        display: none;
-      }
-      .info {
-        background: #bee3f8;
-        color: #2c5282;
-        border-left: 4px solid #3182ce;
-      }
-      .success {
-        background: #c6f6d5;
-        color: #22543d;
-        border-left: 4px solid #38a169;
-      }
-      .error {
-        background: #fed7d7;
-        color: #742a2a;
-        border-left: 4px solid #e53e3e;
-      }
-      .processing {
-        background: #fefcbf;
-        color: #744210;
-        border-left: 4px solid #d69e2e;
-      }
-      .progress-bar {
-        height: 6px;
-        background: #e2e8f0;
-        border-radius: 3px;
-        overflow: hidden;
-        margin-top: 12px;
-      }
-      .progress-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        width: 0%;
-        transition: width 0.3s ease;
       }
       .file-info {
+        display: none;
         background: #edf2f7;
-        padding: 12px;
-        border-radius: 6px;
-        margin-top: 12px;
-        font-size: 13px;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+      }
+      .file-info p {
+        margin: 4px 0;
         color: #2d3748;
+        font-size: 13px;
       }
       .file-info strong {
         color: #1a202c;
       }
-      .stats {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-top: 12px;
+      .status {
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        display: none;
+        font-size: 14px;
+        line-height: 1.4;
       }
-      .stat {
-        background: #f7fafc;
-        padding: 8px;
+      .status.success {
+        background: #f0fff4;
+        color: #22543d;
+        border-left: 4px solid #48bb78;
+      }
+      .status.error {
+        background: #fff5f5;
+        color: #742a2a;
+        border-left: 4px solid #f56565;
+      }
+      .status.processing {
+        background: #ebf8ff;
+        color: #2c5282;
+        border-left: 4px solid #4299e1;
+      }
+      .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: #e2e8f0;
         border-radius: 4px;
-        text-align: center;
+        overflow: hidden;
+        margin-top: 8px;
       }
-      .stat-value {
-        font-size: 20px;
-        font-weight: 700;
-        color: #667eea;
-      }
-      .stat-label {
-        font-size: 11px;
-        color: #718096;
-        text-transform: uppercase;
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        transition: width 0.3s;
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h2>🚀 Website Importer Pro</h2>
+      <h2>🎨 Website Importer Pro</h2>
 
       <div class="upload-area" id="upload-area">
         <div class="upload-icon">📁</div>
-        <div class="upload-text">Click to upload JSON</div>
-        <div class="upload-hint">From your Puppeteer scraper</div>
+        <div class="upload-text">Click or drag JSON file here</div>
+        <div class="upload-hint">Scraped website data (JSON format)</div>
       </div>
 
       <input type="file" id="file-input" accept=".json" />
 
-      <div id="file-info" class="file-info" style="display: none">
-        <strong>File:</strong> <span id="file-name"></span>
-        <div class="stats">
-          <div class="stat">
-            <div class="stat-value" id="element-count">0</div>
-            <div class="stat-label">Elements</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value" id="media-count">0</div>
-            <div class="stat-label">Media</div>
-          </div>
-        </div>
+      <div class="file-info" id="file-info">
+        <p><strong>File:</strong> <span id="file-name"></span></p>
+        <p><strong>Elements:</strong> <span id="element-count"></span></p>
+        <p><strong>Media:</strong> <span id="media-count"></span></p>
       </div>
 
-      <button id="import-btn" disabled>Import to Penpot</button>
+      <div class="status" id="status"></div>
 
-      <div id="status"></div>
+      <button id="import-btn" disabled>Import to Penpot</button>
     </div>
 
     <script>
@@ -257,7 +226,6 @@
 
           currentData = data;
 
-          // Count elements and media
           const stats = analyzeData(data);
 
           uploadArea.classList.add("active");
@@ -287,7 +255,7 @@
         function traverse(node) {
           if (!node) return;
           elements++;
-          if (node.tag === "img" || node.src) images++;
+          if (node.tag === "img" || node.src || node.imageDataUrl) images++;
           if (node.tag === "svg" || node.svgDataUrl) svgs++;
           if (node.children) node.children.forEach(traverse);
         }
@@ -302,10 +270,6 @@
 
         return { elements, images, svgs };
       }
-
-      // ========================================
-      // FETCH IMAGES WITH CORS PROXY
-      // ========================================
 
       async function fetchImage(url) {
         console.log("[UI] Fetching:", url);
@@ -333,10 +297,6 @@
 
         throw new Error("All fetch methods failed");
       }
-
-      // ========================================
-      // CLEAN SVG (simplified version)
-      // ========================================
 
       function cleanSVG(svgString) {
         const parser = new DOMParser();
@@ -408,18 +368,13 @@
         });
       }
 
-      // ========================================
-      // PROCESS ALL MEDIA BEFORE IMPORT
-      // ========================================
-
       async function processMediaInStructure(structure) {
         let processed = 0;
         let total = 0;
 
-        // Count total media
         function countMedia(node) {
           if (!node) return;
-          if (node.src || node.svgDataUrl) total++;
+          if (node.src || node.svgDataUrl || node.imageDataUrl) total++;
           if (node.children) node.children.forEach(countMedia);
         }
 
@@ -427,16 +382,37 @@
           if (structure[key]) countMedia(structure[key]);
         }
 
-        // Process media recursively
         async function processNode(node) {
           if (!node) return;
 
-          // Process image
+          // ADDED: Process pre-rendered images (imageDataUrl)
+          if (node.imageDataUrl && !node.imageData) {
+            try {
+              setProgress(
+                `Processing pre-rendered image ${processed + 1}/${total}...`,
+                (processed / total) * 33
+              );
+
+              const response = await fetch(node.imageDataUrl);
+              const arrayBuffer = await response.arrayBuffer();
+              const uint8Array = new Uint8Array(arrayBuffer);
+              node.imageData = Array.from(uint8Array);
+              node.mime = "image/png";
+
+              console.log("[UI] ✓ Processed imageDataUrl");
+              processed++;
+            } catch (err) {
+              console.error("[UI] imageDataUrl processing failed:", err);
+              processed++;
+            }
+          }
+
+          // Process regular image URLs
           if (node.src && !node.imageData) {
             try {
               setProgress(
                 `Fetching image ${processed + 1}/${total}...`,
-                (processed / total) * 50
+                33 + (processed / total) * 33
               );
 
               const response = await fetchImage(node.src);
@@ -445,7 +421,6 @@
 
               node.imageData = Array.from(uint8Array);
 
-              // Detect MIME
               node.mime = "image/png";
               if (uint8Array[0] === 0xff && uint8Array[1] === 0xd8)
                 node.mime = "image/jpeg";
@@ -467,7 +442,7 @@
             try {
               setProgress(
                 `Cleaning SVG ${processed + 1}/${total}...`,
-                50 + (processed / total) * 50
+                66 + (processed / total) * 34
               );
 
               const svgString = atob(node.svgDataUrl.split(",")[1]);
@@ -484,7 +459,6 @@
             }
           }
 
-          // Recurse
           if (node.children) {
             for (const child of node.children) {
               await processNode(child);
@@ -492,7 +466,6 @@
           }
         }
 
-        // Process all sections
         for (const key in structure) {
           if (structure[key]) {
             await processNode(structure[key]);
@@ -502,10 +475,6 @@
         return { processed, total };
       }
 
-      // ========================================
-      // IMPORT BUTTON
-      // ========================================
-
       importBtn.addEventListener("click", async () => {
         if (!currentData) return;
 
@@ -513,12 +482,10 @@
         setStatus("Processing media...", "processing");
 
         try {
-          // Process all images and SVGs
           const stats = await processMediaInStructure(currentData.structure);
 
           setProgress("Sending to Penpot...", 100);
 
-          // Send complete data to plugin
           parent.postMessage(
             {
               pluginMessage: {
@@ -534,7 +501,6 @@
         }
       });
 
-      // Listen for plugin responses
       window.addEventListener("message", (event) => {
         const msg = event.data && event.data.pluginMessage;
         if (!msg) return;
