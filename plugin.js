@@ -1,4 +1,4 @@
-// plugin.js - Website Importer Pro - FINAL VERSION
+// plugin.js - Website Importer Pro - FINAL VERSION with keepAspectRatio
 console.log("[Importer Pro] Loading...");
 
 penpot.ui.open("Website Importer Pro", "./website-importer-pro/ui.html", {
@@ -164,14 +164,12 @@ function flattenNode(node, elements, depth) {
   const hasFills = element.fills && element.fills.length > 0;
   const hasReasonableSize = element.width > 10 && element.height > 10;
 
-  // FIXED: Always allow text elements regardless of size
   const notTooSmall = hasText || element.width * element.height > 100;
 
   const hasContentToRender = hasMedia || hasText;
   const isBackgroundDiv =
     hasFills && !hasText && !hasMedia && element.hasChildren;
 
-  // FIXED: Import if has ANY content (text, media, or fills)
   if (
     isVisible &&
     hasReasonableSize &&
@@ -180,13 +178,6 @@ function flattenNode(node, elements, depth) {
     (hasText || hasMedia || hasFills)
   ) {
     elements.push(element);
-    console.log(
-      "[Flatten] Adding element:",
-      element.type,
-      element.name,
-      "text:",
-      hasText ? element.text.substring(0, 30) : "none"
-    );
   }
 
   if (node.children && Array.isArray(node.children)) {
@@ -232,7 +223,15 @@ async function importImage(imageDataArray, mime, element) {
     rect.y = element.y;
     rect.resize(element.width, element.height);
     rect.name = element.name || "Image";
-    rect.fills = [{ fillOpacity: 1, fillImage: imageMedia }];
+
+    // FIXED: Add keepAspectRatio
+    rect.fills = [
+      {
+        fillOpacity: 1,
+        fillImage: imageMedia,
+        keepAspectRatio: true,
+      },
+    ];
 
     return rect;
   } catch (err) {
@@ -264,7 +263,15 @@ async function importSVG(imageDataArray, element) {
     rect.y = element.y;
     rect.resize(element.width, element.height);
     rect.name = element.name || "SVG";
-    rect.fills = [{ fillOpacity: 1, fillImage: imageMedia }];
+
+    // FIXED: Add keepAspectRatio
+    rect.fills = [
+      {
+        fillOpacity: 1,
+        fillImage: imageMedia,
+        keepAspectRatio: true,
+      },
+    ];
 
     return rect;
   } catch (err) {
@@ -280,7 +287,6 @@ function importText(element) {
     text.y = element.y;
     text.resize(element.width, element.height);
 
-    // Add alignment suffix to name
     let alignmentSuffix = "";
     if (element.textAlign === "center") {
       alignmentSuffix = " [CENTER]";
@@ -300,13 +306,6 @@ function importText(element) {
         { fillColor: element.color, fillOpacity: element.opacity || 1 },
       ];
     }
-
-    console.log(
-      "[Importer Pro] Created text:",
-      text.name,
-      "color:",
-      element.color
-    );
 
     return text;
   } catch (err) {
