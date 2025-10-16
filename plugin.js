@@ -217,13 +217,22 @@ async function importImage(imageDataArray, mime, element) {
       throw new Error("Image upload failed - no media ID");
     }
 
+    // Get actual image dimensions from uploaded media
+    const actualWidth = imageMedia.width || element.width;
+    const actualHeight = imageMedia.height || element.height;
+
+    console.log(
+      `[Importer Pro] Image dimensions - Scraped: ${element.width}x${element.height}, Actual: ${actualWidth}x${actualHeight}`
+    );
+
     const rect = penpot.createRectangle();
     rect.x = element.x;
     rect.y = element.y;
-    rect.resize(element.width, element.height);
+
+    // Use actual image dimensions instead of scraped dimensions
+    rect.resize(actualWidth, actualHeight);
     rect.name = element.name + " (Image)";
 
-    // Set fill with keepAspectRatio
     rect.fills = [
       {
         fillOpacity: 1,
@@ -232,11 +241,7 @@ async function importImage(imageDataArray, mime, element) {
       },
     ];
 
-    // Add shape-level proportional lock
-    rect.constraints = {
-      horizontal: "scale",
-      vertical: "scale",
-    };
+    // Lock proportions at shape level
     rect.proportionLock = true;
 
     return rect;
@@ -263,13 +268,22 @@ async function importSVG(imageDataArray, element) {
       throw new Error("SVG upload failed - no media ID");
     }
 
+    // Get actual image dimensions from uploaded media
+    const actualWidth = imageMedia.width || element.width;
+    const actualHeight = imageMedia.height || element.height;
+
+    console.log(
+      `[Importer Pro] SVG dimensions - Scraped: ${element.width}x${element.height}, Actual: ${actualWidth}x${actualHeight}`
+    );
+
     const rect = penpot.createRectangle();
     rect.x = element.x;
     rect.y = element.y;
-    rect.resize(element.width, element.height);
+
+    // Use actual image dimensions instead of scraped dimensions
+    rect.resize(actualWidth, actualHeight);
     rect.name = element.name + " (SVG)";
 
-    // Set fill with keepAspectRatio
     rect.fills = [
       {
         fillOpacity: 1,
@@ -278,11 +292,7 @@ async function importSVG(imageDataArray, element) {
       },
     ];
 
-    // Add shape-level proportional lock
-    rect.constraints = {
-      horizontal: "scale",
-      vertical: "scale",
-    };
+    // Lock proportions at shape level
     rect.proportionLock = true;
 
     return rect;
