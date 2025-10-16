@@ -1,4 +1,5 @@
-// plugin.js - Website Importer Pro - FINAL VERSION with keepAspectRatio
+// plugin.js - Website Importer Pro - Optimized with pre-rendered images
+
 console.log("[Importer Pro] Loading...");
 
 penpot.ui.open("Website Importer Pro", "./website-importer-pro/ui.html", {
@@ -19,42 +20,33 @@ function sendToUI(type, data) {
 function rgbToHex(rgbString) {
   if (!rgbString || typeof rgbString !== "string") return "#000000";
   if (rgbString.startsWith("#")) return rgbString;
-
   const match = rgbString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   if (!match) return "#000000";
-
   const r = parseInt(match[1]).toString(16).padStart(2, "0");
   const g = parseInt(match[2]).toString(16).padStart(2, "0");
   const b = parseInt(match[3]).toString(16).padStart(2, "0");
-
   return `#${r}${g}${b}`;
 }
 
 function extractColorFromGradient(gradientString) {
   if (!gradientString) return null;
-
   const match = gradientString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
   if (match) {
     return rgbToHex(`rgb(${match[1]}, ${match[2]}, ${match[3]})`);
   }
-
   if (gradientString.includes("255, 255, 255")) {
     return "#ffffff";
   }
-
   return "#71717a";
 }
 
 function cleanFontFamily(fontFamilyStr) {
   if (!fontFamilyStr) return "Inter";
-
   const firstFont = fontFamilyStr.split(",")[0].replace(/['"]/g, "").trim();
-
   if (firstFont.startsWith("__")) {
     const match = firstFont.match(/__([A-Za-z]+)_/);
     if (match) return match[1];
   }
-
   const cleaned = firstFont.replace(/_[a-z0-9]+$/i, "");
   return cleaned || "Inter";
 }
@@ -67,6 +59,8 @@ function normalizeFontWeight(weight) {
 }
 
 function determineElementType(node) {
+  // Check for pre-rendered image data first
+  if (node.imageDataUrl) return "image";
   if (node.tag === "img" || node.src) return "image";
   if (node.tag === "svg" || node.svgDataUrl) return "svg";
   if (node.text && node.text.trim()) return "text";
@@ -75,17 +69,14 @@ function determineElementType(node) {
 
 function flattenStructure(structure, elements = []) {
   console.log("[Flatten] Input structure keys:", Object.keys(structure));
-
   const sections = [];
   for (const key in structure) {
     if (structure[key] && typeof structure[key] === "object") {
       sections.push(structure[key]);
     }
   }
-
   console.log("[Flatten] Found", sections.length, "top-level sections");
   sections.forEach((section) => flattenNode(section, elements, 0));
-
   return elements;
 }
 
@@ -102,6 +93,7 @@ function flattenNode(node, elements, depth) {
     text: node.text || null,
     src: node.src || null,
     svgDataUrl: node.svgDataUrl || null,
+    imageDataUrl: node.imageDataUrl || null, // Pre-rendered image
     imageData: node.imageData || null,
     svgData: node.svgData || null,
     mime: node.mime || "image/png",
@@ -139,19 +131,15 @@ function flattenNode(node, elements, depth) {
     if (node.styles.fontSize) {
       element.fontSize = parseInt(node.styles.fontSize) || 16;
     }
-
     if (node.styles.fontFamily) {
       element.fontFamily = cleanFontFamily(node.styles.fontFamily);
     }
-
     if (node.styles.fontWeight) {
       element.fontWeight = normalizeFontWeight(node.styles.fontWeight);
     }
-
     if (node.styles.opacity) {
       element.opacity = parseFloat(node.styles.opacity) || 1;
     }
-
     if (node.styles.textAlign) {
       element.textAlign = node.styles.textAlign;
     }
@@ -159,14 +147,15 @@ function flattenNode(node, elements, depth) {
 
   const isVisible = element.opacity > 0.01;
   const hasMedia =
-    element.src || element.svgDataUrl || element.imageData || element.svgData;
+    element.src ||
+    element.svgDataUrl ||
+    element.imageData ||
+    element.svgData ||
+    element.imageDataUrl;
   const hasText = element.text && element.text.trim().length > 0;
   const hasFills = element.fills && element.fills.length > 0;
   const hasReasonableSize = element.width > 10 && element.height > 10;
-
   const notTooSmall = hasText || element.width * element.height > 100;
-
-  const hasContentToRender = hasMedia || hasText;
   const isBackgroundDiv =
     hasFills && !hasText && !hasMedia && element.hasChildren;
 
@@ -188,14 +177,12 @@ function flattenNode(node, elements, depth) {
 function calculateBoardDimensions(elements) {
   let maxX = 1920;
   let maxY = 1080;
-
   elements.forEach((el) => {
     const endX = el.x + el.width;
     const endY = el.y + el.height;
     if (endX > maxX) maxX = endX;
     if (endY > maxY) maxY = endY;
   });
-
   return {
     width: Math.ceil(maxX + 100),
     height: Math.ceil(maxY + 100),
@@ -217,48 +204,22 @@ async function importImage(imageDataArray, mime, element) {
       throw new Error("Image upload failed - no media ID");
     }
 
-    const actualWidth = imageMedia.width || element.width;
-    const actualHeight = imageMedia.height || element.height;
-    const layoutWidth = element.width;
-    const layoutHeight = element.height;
-
-    let finalWidth, finalHeight;
-
-    // For small elements (< 200x200), use CSS dimensions
-    if (layoutWidth < 200 && layoutHeight < 200) {
-      finalWidth = layoutWidth;
-      finalHeight = layoutHeight;
-    } else {
-      // For larger images, maintain aspect ratio
-      const imageAspect = actualWidth / actualHeight;
-      const layoutAspect = layoutWidth / layoutHeight;
-
-      if (imageAspect > layoutAspect) {
-        finalWidth = layoutWidth;
-        finalHeight = layoutWidth / imageAspect;
-      } else {
-        finalHeight = layoutHeight;
-        finalWidth = layoutHeight * imageAspect;
-      }
-    }
-
     const rect = penpot.createRectangle();
     rect.x = element.x;
     rect.y = element.y;
-    rect.resize(finalWidth, finalHeight);
-    rect.name = element.name + " (Image)";
+    rect.resize(element.width, element.height);
+    rect.name = element.name || "Image";
 
+    // Use exact dimensions - image is pre-rendered at correct size
     rect.fills = [
       {
         fillOpacity: 1,
         fillImage: imageMedia,
-        keepAspectRatio: true,
+        keepAspectRatio: false, // Already correct dimensions
       },
     ];
 
     rect.proportionLock = true;
-
-    console.log(`[Importer Pro] Image imported: ${finalWidth}x${finalHeight}`);
     return rect;
   } catch (err) {
     console.error("[Importer Pro] Image import error:", err);
@@ -286,25 +247,19 @@ async function importSVG(imageDataArray, element) {
     const rect = penpot.createRectangle();
     rect.x = element.x;
     rect.y = element.y;
-
-    // Simply use the scraped dimensions - no calculations
     rect.resize(element.width, element.height);
-    rect.name = element.name + " (SVG)";
+    rect.name = element.name || "SVG";
 
-    // Fill without aspect ratio preservation
+    // Use exact dimensions - SVG is pre-rendered at correct size
     rect.fills = [
       {
         fillOpacity: 1,
         fillImage: imageMedia,
-        keepAspectRatio: false,
+        keepAspectRatio: false, // Already correct dimensions
       },
     ];
 
     rect.proportionLock = true;
-
-    console.log(
-      `[Importer Pro] SVG imported at: ${element.width}x${element.height}`
-    );
     return rect;
   } catch (err) {
     console.error("[Importer Pro] SVG import error:", err);
@@ -329,7 +284,6 @@ function importText(element) {
     }
 
     text.name = (element.name || "Text") + alignmentSuffix;
-
     if (element.fontSize) text.fontSize = element.fontSize;
     if (element.fontFamily) text.fontFamily = element.fontFamily;
     if (element.fontWeight) text.fontWeight = element.fontWeight;
@@ -357,6 +311,7 @@ function importShape(element) {
     if (element.fills && element.fills.length > 0) {
       rect.fills = element.fills;
     }
+
     if (element.borderRadius) {
       rect.borderRadius = element.borderRadius;
     }
@@ -389,7 +344,6 @@ async function importWebsite(data) {
   }
 
   sendToUI("progress", { message: "Calculating dimensions...", percent: 3 });
-
   const dimensions = calculateBoardDimensions(elements);
   console.log(
     "[Importer Pro] Board dimensions:",
@@ -399,7 +353,6 @@ async function importWebsite(data) {
   );
 
   sendToUI("progress", { message: "Creating board...", percent: 5 });
-
   const board = penpot.createBoard();
   board.name = data.metadata?.title || "Imported Website";
   board.resize(dimensions.width, dimensions.height);
@@ -447,7 +400,6 @@ async function importWebsite(data) {
       }
 
       completed++;
-
       if (completed % 100 === 0) {
         console.log(
           "[Importer Pro] Progress:",
@@ -489,7 +441,6 @@ async function importWebsite(data) {
 
 penpot.ui.onMessage(async (message) => {
   const msg = message.pluginMessage || message;
-
   console.log("[Importer Pro] Received message type:", msg.type);
 
   if (msg.type === "import-website") {
