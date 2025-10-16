@@ -225,26 +225,35 @@ async function importImage(imageDataArray, mime, element) {
     const layoutWidth = element.width;
     const layoutHeight = element.height;
 
-    // Calculate aspect ratios
-    const imageAspect = actualWidth / actualHeight;
-    const layoutAspect = layoutWidth / layoutHeight;
-
     let finalWidth, finalHeight;
 
-    // Scale to fit within layout bounds while maintaining aspect ratio
-    if (imageAspect > layoutAspect) {
-      // Image is wider - fit to width
+    // For small elements (logos, icons) under 200x200, use CSS dimensions directly
+    // This prevents logos from being scaled incorrectly
+    if (layoutWidth < 200 && layoutHeight < 200) {
       finalWidth = layoutWidth;
-      finalHeight = layoutWidth / imageAspect;
-    } else {
-      // Image is taller - fit to height
       finalHeight = layoutHeight;
-      finalWidth = layoutHeight * imageAspect;
-    }
+      console.log(
+        `[Importer Pro] Small element - using CSS dimensions: ${finalWidth}x${finalHeight}`
+      );
+    } else {
+      // For larger images, calculate aspect ratios
+      const imageAspect = actualWidth / actualHeight;
+      const layoutAspect = layoutWidth / layoutHeight;
 
-    console.log(
-      `[Importer Pro] Dimensions - Layout: ${layoutWidth}x${layoutHeight}, Final: ${finalWidth}x${finalHeight}`
-    );
+      // Scale to fit within layout bounds while maintaining aspect ratio
+      if (imageAspect > layoutAspect) {
+        // Image is wider - fit to width
+        finalWidth = layoutWidth;
+        finalHeight = layoutWidth / imageAspect;
+      } else {
+        // Image is taller - fit to height
+        finalHeight = layoutHeight;
+        finalWidth = layoutHeight * imageAspect;
+      }
+      console.log(
+        `[Importer Pro] Large image - aspect ratio scaling: ${finalWidth}x${finalHeight}`
+      );
+    }
 
     const rect = penpot.createRectangle();
     rect.x = element.x;
@@ -294,26 +303,34 @@ async function importSVG(imageDataArray, element) {
     const layoutWidth = element.width;
     const layoutHeight = element.height;
 
-    // Calculate aspect ratios
-    const imageAspect = actualWidth / actualHeight;
-    const layoutAspect = layoutWidth / layoutHeight;
-
     let finalWidth, finalHeight;
 
-    // Scale to fit within layout bounds while maintaining aspect ratio
-    if (imageAspect > layoutAspect) {
-      // Image is wider - fit to width
+    // For small elements (logos, icons) under 200x200, use CSS dimensions directly
+    if (layoutWidth < 200 && layoutHeight < 200) {
       finalWidth = layoutWidth;
-      finalHeight = layoutWidth / imageAspect;
-    } else {
-      // Image is taller - fit to height
       finalHeight = layoutHeight;
-      finalWidth = layoutHeight * imageAspect;
-    }
+      console.log(
+        `[Importer Pro] Small SVG - using CSS dimensions: ${finalWidth}x${finalHeight}`
+      );
+    } else {
+      // For larger SVGs, calculate aspect ratios
+      const imageAspect = actualWidth / actualHeight;
+      const layoutAspect = layoutWidth / layoutHeight;
 
-    console.log(
-      `[Importer Pro] SVG Dimensions - Layout: ${layoutWidth}x${layoutHeight}, Final: ${finalWidth}x${finalHeight}`
-    );
+      // Scale to fit within layout bounds while maintaining aspect ratio
+      if (imageAspect > layoutAspect) {
+        // Image is wider - fit to width
+        finalWidth = layoutWidth;
+        finalHeight = layoutWidth / imageAspect;
+      } else {
+        // Image is taller - fit to height
+        finalHeight = layoutHeight;
+        finalWidth = layoutHeight * imageAspect;
+      }
+      console.log(
+        `[Importer Pro] Large SVG - aspect ratio scaling: ${finalWidth}x${finalHeight}`
+      );
+    }
 
     const rect = penpot.createRectangle();
     rect.x = element.x;
