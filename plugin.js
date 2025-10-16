@@ -1,4 +1,4 @@
-// plugin.js - Website Importer Pro - FINAL with Gradient Text & Text Align
+// plugin.js - Website Importer Pro - FINAL VERSION with horizontalAlignment
 console.log("[Importer Pro] Loading...");
 
 penpot.ui.open("Website Importer Pro", "./website-importer-pro/ui.html", {
@@ -30,23 +30,18 @@ function rgbToHex(rgbString) {
   return `#${r}${g}${b}`;
 }
 
-// FIXED: Extract color from gradient for text
 function extractColorFromGradient(gradientString) {
   if (!gradientString) return null;
 
-  // linear-gradient(to right bottom, rgb(255, 255, 255), rgb(113, 113, 122))
-  // Extract first color (usually the main color)
   const match = gradientString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
   if (match) {
     return rgbToHex(`rgb(${match[1]}, ${match[2]}, ${match[3]})`);
   }
 
-  // If gradient goes from white to gray, use white
   if (gradientString.includes("255, 255, 255")) {
     return "#ffffff";
   }
 
-  // Fallback to gray
   return "#71717a";
 }
 
@@ -121,14 +116,12 @@ function flattenNode(node, elements, depth) {
   };
 
   if (node.styles) {
-    // FIXED: Handle gradient text
     if (
       node.styles.backgroundImage &&
       node.styles.backgroundImage.includes("gradient") &&
       (node.styles.color === "rgba(0, 0, 0, 0)" ||
         node.styles.color === "transparent")
     ) {
-      // Extract color from gradient
       element.color = extractColorFromGradient(node.styles.backgroundImage);
     } else if (node.styles.color) {
       element.color = rgbToHex(node.styles.color);
@@ -159,7 +152,6 @@ function flattenNode(node, elements, depth) {
       element.opacity = parseFloat(node.styles.opacity) || 1;
     }
 
-    // FIXED: Text align
     if (node.styles.textAlign) {
       element.textAlign = node.styles.textAlign;
     }
@@ -288,14 +280,19 @@ function importText(element) {
       ];
     }
 
-    // FIXED: Apply text align
+    // FIXED: Use correct property 'horizontalAlignment'
     if (element.textAlign) {
       if (element.textAlign === "center") {
-        text.horizontalAlign = "center";
+        text.horizontalAlignment = "center";
       } else if (element.textAlign === "right") {
-        text.horizontalAlign = "right";
-      } else {
-        text.horizontalAlign = "left";
+        text.horizontalAlignment = "right";
+      } else if (element.textAlign === "justify") {
+        text.horizontalAlignment = "justify";
+      } else if (
+        element.textAlign === "start" ||
+        element.textAlign === "left"
+      ) {
+        text.horizontalAlignment = "left";
       }
     }
 
