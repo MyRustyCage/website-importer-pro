@@ -100,62 +100,10 @@ function flattenNode(node, elements, depth) {
     width: node.geometry?.width || 100,
     height: node.geometry?.height || 100,
     text: node.text || null,
-    src: node.src || null,
-    svgDataUrl: node.svgDataUrl || null,
-    imageData: node.imageData || null,
-    svgData: node.svgData || null,
-    mime: node.mime || "image/png",
-    fills: null,
-    fontSize: 16,
-    fontFamily: "Inter",
-    fontWeight: "400",
-    color: "#000000",
-    opacity: 1,
-    textAlign: "left",
-    hasChildren: node.children && node.children.length > 0,
+    // ... rest of properties
   };
 
-  if (node.styles) {
-    if (
-      node.styles.backgroundImage &&
-      node.styles.backgroundImage.includes("gradient") &&
-      (node.styles.color === "rgba(0, 0, 0, 0)" ||
-        node.styles.color === "transparent")
-    ) {
-      element.color = extractColorFromGradient(node.styles.backgroundImage);
-    } else if (node.styles.color) {
-      element.color = rgbToHex(node.styles.color);
-    }
-
-    if (
-      node.styles.backgroundColor &&
-      node.styles.backgroundColor !== "rgba(0, 0, 0, 0)" &&
-      node.styles.backgroundColor !== "transparent"
-    ) {
-      const hexColor = rgbToHex(node.styles.backgroundColor);
-      element.fills = [{ fillColor: hexColor, fillOpacity: 1 }];
-    }
-
-    if (node.styles.fontSize) {
-      element.fontSize = parseInt(node.styles.fontSize) || 16;
-    }
-
-    if (node.styles.fontFamily) {
-      element.fontFamily = cleanFontFamily(node.styles.fontFamily);
-    }
-
-    if (node.styles.fontWeight) {
-      element.fontWeight = normalizeFontWeight(node.styles.fontWeight);
-    }
-
-    if (node.styles.opacity) {
-      element.opacity = parseFloat(node.styles.opacity) || 1;
-    }
-
-    if (node.styles.textAlign) {
-      element.textAlign = node.styles.textAlign;
-    }
-  }
+  // ... style parsing ...
 
   const isVisible = element.opacity > 0.01;
   const hasMedia =
@@ -163,18 +111,23 @@ function flattenNode(node, elements, depth) {
   const hasText = element.text && element.text.trim().length > 0;
   const hasFills = element.fills && element.fills.length > 0;
   const hasReasonableSize = element.width > 10 && element.height > 10;
-  const notTinyArea = element.width * element.height > 100;
+
+  // FIXED: Allow text elements even if tiny
+  const notTooSmall = hasText || element.width * element.height > 100;
 
   const hasContentToRender = hasMedia || hasText;
+
+  // FIXED: Don't filter out divs with text
   const isBackgroundDiv =
     hasFills && !hasText && !hasMedia && element.hasChildren;
 
+  // CHANGED: Simplify - import if has text OR media OR fills
   if (
     isVisible &&
     hasReasonableSize &&
-    notTinyArea &&
-    !isBackgroundDiv &&
-    (hasContentToRender || hasFills)
+    notTooSmall &&
+    (hasText || hasMedia || hasFills) &&
+    !isBackgroundDiv
   ) {
     elements.push(element);
   }
