@@ -283,50 +283,27 @@ async function importSVG(imageDataArray, element) {
       throw new Error("SVG upload failed - no media ID");
     }
 
-    // Get actual SVG dimensions
-    const actualWidth = imageMedia.width || element.width;
-    const actualHeight = imageMedia.height || element.height;
-    const imageAspect = actualWidth / actualHeight;
-
-    // Get layout constraints from scraped data
-    const layoutWidth = element.width;
-    const layoutHeight = element.height;
-
-    // Calculate dimensions that fit within layout while maintaining SVG aspect ratio
-    let finalWidth, finalHeight;
-    const layoutAspect = layoutWidth / layoutHeight;
-
-    if (imageAspect > layoutAspect) {
-      // SVG is wider - constrain by width
-      finalWidth = layoutWidth;
-      finalHeight = layoutWidth / imageAspect;
-    } else {
-      // SVG is taller - constrain by height
-      finalHeight = layoutHeight;
-      finalWidth = layoutHeight * imageAspect;
-    }
-
     const rect = penpot.createRectangle();
     rect.x = element.x;
     rect.y = element.y;
-    rect.resize(finalWidth, finalHeight);
+
+    // Simply use the scraped dimensions - no calculations
+    rect.resize(element.width, element.height);
     rect.name = element.name + " (SVG)";
 
-    // DON'T use keepAspectRatio - we've already sized correctly
+    // Fill without aspect ratio preservation
     rect.fills = [
       {
         fillOpacity: 1,
         fillImage: imageMedia,
-        keepAspectRatio: false, // Changed to false!
+        keepAspectRatio: false,
       },
     ];
 
     rect.proportionLock = true;
 
     console.log(
-      `[Importer Pro] SVG: layout ${layoutWidth}x${layoutHeight}, final ${Math.round(
-        finalWidth
-      )}x${Math.round(finalHeight)}`
+      `[Importer Pro] SVG imported at: ${element.width}x${element.height}`
     );
     return rect;
   } catch (err) {
