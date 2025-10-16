@@ -1,4 +1,4 @@
-// plugin.js - Website Importer Pro - Final version with SVG pre-rendering support
+// plugin.js - Website Importer Pro - Universal Version
 
 console.log("[Importer Pro] Loading...");
 
@@ -34,9 +34,7 @@ function extractColorFromGradient(gradientString) {
   if (match) {
     return rgbToHex(`rgb(${match[1]}, ${match[2]}, ${match[3]})`);
   }
-  if (gradientString.includes("255, 255, 255")) {
-    return "#ffffff";
-  }
+  if (gradientString.includes("255, 255, 255")) return "#ffffff";
   return "#71717a";
 }
 
@@ -59,13 +57,9 @@ function normalizeFontWeight(weight) {
 }
 
 function determineElementType(node) {
-  // Check for pre-rendered image data first (SVG-in-container)
   if (node.imageDataUrl) return "image";
-  // Check for regular images
   if (node.tag === "img" || node.src) return "image";
-  // Check for SVG
   if (node.tag === "svg" || node.svgDataUrl) return "svg";
-  // Check for text
   if (node.text && node.text.trim()) return "text";
   return "shape";
 }
@@ -96,7 +90,7 @@ function flattenNode(node, elements, depth) {
     text: node.text || null,
     src: node.src || null,
     svgDataUrl: node.svgDataUrl || null,
-    imageDataUrl: node.imageDataUrl || null, // Pre-rendered images
+    imageDataUrl: node.imageDataUrl || null,
     imageData: node.imageData || null,
     svgData: node.svgData || null,
     mime: node.mime || "image/png",
@@ -213,12 +207,11 @@ async function importImage(imageDataArray, mime, element) {
     rect.resize(element.width, element.height);
     rect.name = element.name || "Image";
 
-    // Use exact dimensions - image is pre-rendered at correct size
     rect.fills = [
       {
         fillOpacity: 1,
         fillImage: imageMedia,
-        keepAspectRatio: false, // Already correct dimensions
+        keepAspectRatio: false,
       },
     ];
 
@@ -253,12 +246,11 @@ async function importSVG(imageDataArray, element) {
     rect.resize(element.width, element.height);
     rect.name = element.name || "SVG";
 
-    // Use exact dimensions - SVG is pre-rendered at correct size
     rect.fills = [
       {
         fillOpacity: 1,
         fillImage: imageMedia,
-        keepAspectRatio: false, // Already correct dimensions
+        keepAspectRatio: false,
       },
     ];
 
@@ -315,20 +307,6 @@ function importShape(element) {
       rect.fills = element.fills;
     }
 
-    // ADDED: Handle radial gradient backgrounds as colored shapes
-    if (
-      element.styles &&
-      element.styles.backgroundImage &&
-      element.styles.backgroundImage.includes("radial-gradient")
-    ) {
-      // Extract first color from radial-gradient
-      const match = element.styles.backgroundImage.match(/rgba?\([\d,\s.]+\)/);
-      if (match) {
-        const color = rgbToHex(match[0]);
-        rect.fills = [{ fillColor: color, fillOpacity: 0.3 }]; // Semi-transparent
-      }
-    }
-
     if (element.borderRadius) {
       rect.borderRadius = element.borderRadius;
     }
@@ -375,7 +353,39 @@ async function importWebsite(data) {
   board.resize(dimensions.width, dimensions.height);
   board.x = 0;
   board.y = 0;
-  board.fills = [{ fillColor: "#09090b", fillOpacity: 1 }];
+
+  // UNIVERSAL: Detect background color
+  let boardBgColor = "#ffffff";
+
+  const detectBg = (node) => {
+    if (!node || !node.styles) return null;
+    const bg = node.styles.backgroundColor;
+    if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") {
+      return rgbToHex(bg);
+    }
+    return null;
+  };
+
+  if (data.structure) {
+    const sources = [
+      data.structure.main,
+      data.structure.header,
+      data.structure.sections?.[0],
+      data.structure.nav,
+      data.structure.footer,
+    ];
+
+    for (const source of sources) {
+      const bg = detectBg(source);
+      if (bg && bg !== "#000000") {
+        boardBgColor = bg;
+        break;
+      }
+    }
+  }
+
+  console.log("[Importer Pro] Board background:", boardBgColor);
+  board.fills = [{ fillColor: boardBgColor, fillOpacity: 1 }];
 
   const total = elements.length;
   let completed = 0;
@@ -388,24 +398,19 @@ async function importWebsite(data) {
     try {
       let shape = null;
 
-      // Handle pre-rendered images (SVG-in-container rendered to PNG)
       if (element.imageDataUrl && element.imageData) {
         sendToUI("progress", {
           message: `Importing pre-rendered image: ${element.name}`,
           percent: 10 + (completed / total) * 85,
         });
         shape = await importImage(element.imageData, element.mime, element);
-      }
-      // Handle regular images
-      else if (element.type === "image" && element.imageData) {
+      } else if (element.type === "image" && element.imageData) {
         sendToUI("progress", {
           message: `Importing image: ${element.name}`,
           percent: 10 + (completed / total) * 85,
         });
         shape = await importImage(element.imageData, element.mime, element);
-      }
-      // Handle SVG (both standalone and those with svgData)
-      else if (
+      } else if (
         (element.type === "svg" || element.svgDataUrl) &&
         element.svgData
       ) {
@@ -414,18 +419,14 @@ async function importWebsite(data) {
           percent: 10 + (completed / total) * 85,
         });
         shape = await importSVG(element.svgData, element);
-      }
-      // Handle text
-      else if (element.type === "text" && element.text) {
+      } else if (element.type === "text" && element.text) {
         sendToUI("progress", {
           message: `Creating text: ${element.name}`,
           percent: 10 + (completed / total) * 85,
         });
         shape = importText(element);
         if (shape) textCount++;
-      }
-      // Handle shapes
-      else if (element.type === "shape" && element.fills) {
+      } else if (element.type === "shape" && element.fills) {
         shape = importShape(element);
       }
 
