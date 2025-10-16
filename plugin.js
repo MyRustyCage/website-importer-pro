@@ -209,7 +209,6 @@ async function importImage(imageDataArray, mime, element) {
     imageDataArray.length,
     "bytes"
   );
-
   try {
     const uint8 = new Uint8Array(imageDataArray);
     const imageMedia = await penpot.uploadMediaData("image", uint8, mime);
@@ -222,9 +221,9 @@ async function importImage(imageDataArray, mime, element) {
     rect.x = element.x;
     rect.y = element.y;
     rect.resize(element.width, element.height);
-    rect.name = element.name || "Image";
+    rect.name = element.name + " (Image)";
 
-    // FIXED: Add keepAspectRatio
+    // Set fill with keepAspectRatio
     rect.fills = [
       {
         fillOpacity: 1,
@@ -232,6 +231,13 @@ async function importImage(imageDataArray, mime, element) {
         keepAspectRatio: true,
       },
     ];
+
+    // Add shape-level proportional lock
+    rect.constraints = {
+      horizontal: "scale",
+      vertical: "scale",
+    };
+    rect.proportionLock = true;
 
     return rect;
   } catch (err) {
@@ -242,10 +248,9 @@ async function importImage(imageDataArray, mime, element) {
 
 async function importSVG(imageDataArray, element) {
   console.log(
-    "[Importer Pro] Importing SVG PNG, length:",
+    "[Importer Pro] Importing SVG (PNG), length:",
     imageDataArray.length
   );
-
   try {
     const uint8 = new Uint8Array(imageDataArray);
     const imageMedia = await penpot.uploadMediaData(
@@ -262,9 +267,9 @@ async function importSVG(imageDataArray, element) {
     rect.x = element.x;
     rect.y = element.y;
     rect.resize(element.width, element.height);
-    rect.name = element.name || "SVG";
+    rect.name = element.name + " (SVG)";
 
-    // FIXED: Add keepAspectRatio
+    // Set fill with keepAspectRatio
     rect.fills = [
       {
         fillOpacity: 1,
@@ -272,6 +277,13 @@ async function importSVG(imageDataArray, element) {
         keepAspectRatio: true,
       },
     ];
+
+    // Add shape-level proportional lock
+    rect.constraints = {
+      horizontal: "scale",
+      vertical: "scale",
+    };
+    rect.proportionLock = true;
 
     return rect;
   } catch (err) {
