@@ -1,4 +1,4 @@
-// plugin.js - Website Importer Pro - FINAL VERSION with horizontalAlignment
+// plugin.js - Website Importer Pro - FINAL VERSION
 console.log("[Importer Pro] Loading...");
 
 penpot.ui.open("Website Importer Pro", "./website-importer-pro/ui.html", {
@@ -100,10 +100,62 @@ function flattenNode(node, elements, depth) {
     width: node.geometry?.width || 100,
     height: node.geometry?.height || 100,
     text: node.text || null,
-    // ... rest of properties
+    src: node.src || null,
+    svgDataUrl: node.svgDataUrl || null,
+    imageData: node.imageData || null,
+    svgData: node.svgData || null,
+    mime: node.mime || "image/png",
+    fills: null,
+    fontSize: 16,
+    fontFamily: "Inter",
+    fontWeight: "400",
+    color: "#000000",
+    opacity: 1,
+    textAlign: "left",
+    hasChildren: node.children && node.children.length > 0,
   };
 
-  // ... style parsing ...
+  if (node.styles) {
+    if (
+      node.styles.backgroundImage &&
+      node.styles.backgroundImage.includes("gradient") &&
+      (node.styles.color === "rgba(0, 0, 0, 0)" ||
+        node.styles.color === "transparent")
+    ) {
+      element.color = extractColorFromGradient(node.styles.backgroundImage);
+    } else if (node.styles.color) {
+      element.color = rgbToHex(node.styles.color);
+    }
+
+    if (
+      node.styles.backgroundColor &&
+      node.styles.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+      node.styles.backgroundColor !== "transparent"
+    ) {
+      const hexColor = rgbToHex(node.styles.backgroundColor);
+      element.fills = [{ fillColor: hexColor, fillOpacity: 1 }];
+    }
+
+    if (node.styles.fontSize) {
+      element.fontSize = parseInt(node.styles.fontSize) || 16;
+    }
+
+    if (node.styles.fontFamily) {
+      element.fontFamily = cleanFontFamily(node.styles.fontFamily);
+    }
+
+    if (node.styles.fontWeight) {
+      element.fontWeight = normalizeFontWeight(node.styles.fontWeight);
+    }
+
+    if (node.styles.opacity) {
+      element.opacity = parseFloat(node.styles.opacity) || 1;
+    }
+
+    if (node.styles.textAlign) {
+      element.textAlign = node.styles.textAlign;
+    }
+  }
 
   const isVisible = element.opacity > 0.01;
   const hasMedia =
@@ -112,24 +164,29 @@ function flattenNode(node, elements, depth) {
   const hasFills = element.fills && element.fills.length > 0;
   const hasReasonableSize = element.width > 10 && element.height > 10;
 
-  // FIXED: Allow text elements even if tiny
+  // FIXED: Always allow text elements regardless of size
   const notTooSmall = hasText || element.width * element.height > 100;
 
   const hasContentToRender = hasMedia || hasText;
-
-  // FIXED: Don't filter out divs with text
   const isBackgroundDiv =
     hasFills && !hasText && !hasMedia && element.hasChildren;
 
-  // CHANGED: Simplify - import if has text OR media OR fills
+  // FIXED: Import if has ANY content (text, media, or fills)
   if (
     isVisible &&
     hasReasonableSize &&
     notTooSmall &&
-    (hasText || hasMedia || hasFills) &&
-    !isBackgroundDiv
+    !isBackgroundDiv &&
+    (hasText || hasMedia || hasFills)
   ) {
     elements.push(element);
+    console.log(
+      "[Flatten] Adding element:",
+      element.type,
+      element.name,
+      "text:",
+      hasText ? element.text.substring(0, 30) : "none"
+    );
   }
 
   if (node.children && Array.isArray(node.children)) {
@@ -222,7 +279,18 @@ function importText(element) {
     text.x = element.x;
     text.y = element.y;
     text.resize(element.width, element.height);
-    text.name = element.name || "Text";
+
+    // Add alignment suffix to name
+    let alignmentSuffix = "";
+    if (element.textAlign === "center") {
+      alignmentSuffix = " [CENTER]";
+    } else if (element.textAlign === "right") {
+      alignmentSuffix = " [RIGHT]";
+    } else if (element.textAlign === "justify") {
+      alignmentSuffix = " [JUSTIFY]";
+    }
+
+    text.name = (element.name || "Text") + alignmentSuffix;
 
     if (element.fontSize) text.fontSize = element.fontSize;
     if (element.fontFamily) text.fontFamily = element.fontFamily;
@@ -233,21 +301,12 @@ function importText(element) {
       ];
     }
 
-    // FIXED: Use correct property 'horizontalAlignment'
-    if (element.textAlign) {
-      if (element.textAlign === "center") {
-        text.horizontalAlignment = "center";
-      } else if (element.textAlign === "right") {
-        text.horizontalAlignment = "right";
-      } else if (element.textAlign === "justify") {
-        text.horizontalAlignment = "justify";
-      } else if (
-        element.textAlign === "start" ||
-        element.textAlign === "left"
-      ) {
-        text.horizontalAlignment = "left";
-      }
-    }
+    console.log(
+      "[Importer Pro] Created text:",
+      text.name,
+      "color:",
+      element.color
+    );
 
     return text;
   } catch (err) {
@@ -320,6 +379,7 @@ async function importWebsite(data) {
   const total = elements.length;
   let completed = 0;
   let imported = 0;
+  let textCount = 0;
 
   console.log("[Importer Pro] Processing", total, "elements");
 
@@ -345,6 +405,7 @@ async function importWebsite(data) {
           percent: 10 + (completed / total) * 85,
         });
         shape = importText(element);
+        if (shape) textCount++;
       } else if (element.type === "shape" && element.fills) {
         shape = importShape(element);
       }
@@ -363,7 +424,9 @@ async function importWebsite(data) {
           "/",
           total,
           "imported:",
-          imported
+          imported,
+          "text:",
+          textCount
         );
       }
     } catch (err) {
@@ -371,7 +434,13 @@ async function importWebsite(data) {
     }
   }
 
-  console.log("[Importer Pro] Import complete:", imported, "elements created");
+  console.log(
+    "[Importer Pro] Import complete:",
+    imported,
+    "elements created (",
+    textCount,
+    "text)"
+  );
   console.log(
     "[Importer Pro] Final board size:",
     dimensions.width,
