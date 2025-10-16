@@ -1,10 +1,14 @@
-// plugin.js - Website Importer Pro - FINAL FIXED VERSION
+// plugin.js - Website Importer Pro - FINAL with Board Calculation & Better Filtering
 console.log("[Importer Pro] Loading...");
 
-penpot.ui.open("Website Importer Pro", "./website-importer-pro/ui.html", {
-  width: 500,
-  height: 700,
-});
+penpot.ui.open(
+  "Website Importer Pro",
+  "https://myrustycage.github.io/website-importer-pro/",
+  {
+    width: 500,
+    height: 700,
+  }
+);
 
 console.log("[Importer Pro] UI opened");
 
@@ -16,14 +20,10 @@ function sendToUI(type, data) {
   }
 }
 
-// FIXED: Convert rgb() to hex
 function rgbToHex(rgbString) {
   if (!rgbString || typeof rgbString !== "string") return "#000000";
-
-  // Already hex
   if (rgbString.startsWith("#")) return rgbString;
 
-  // Parse rgb(r, g, b) or rgba(r, g, b, a)
   const match = rgbString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   if (!match) return "#000000";
 
@@ -34,25 +34,20 @@ function rgbToHex(rgbString) {
   return `#${r}${g}${b}`;
 }
 
-// FIXED: Clean Next.js font names
 function cleanFontFamily(fontFamilyStr) {
   if (!fontFamilyStr) return "Inter";
 
   const firstFont = fontFamilyStr.split(",")[0].replace(/['"]/g, "").trim();
 
-  // Remove __Inter_d65c78 → Inter
   if (firstFont.startsWith("__")) {
     const match = firstFont.match(/__([A-Za-z]+)_/);
     if (match) return match[1];
   }
 
-  // Remove hash suffix
   const cleaned = firstFont.replace(/_[a-z0-9]+$/i, "");
-
   return cleaned || "Inter";
 }
 
-// FIXED: Map to supported weights
 function normalizeFontWeight(weight) {
   if (!weight) return "400";
   const num = parseInt(weight);
@@ -105,10 +100,10 @@ function flattenNode(node, elements, depth) {
     fontWeight: "400",
     color: "#000000",
     opacity: 1,
+    hasChildren: node.children && node.children.length > 0,
   };
 
   if (node.styles) {
-    // FIXED: Only add fills if NOT transparent
     if (
       node.styles.backgroundColor &&
       node.styles.backgroundColor !== "rgba(0, 0, 0, 0)" &&
@@ -122,17 +117,14 @@ function flattenNode(node, elements, depth) {
       element.fontSize = parseInt(node.styles.fontSize) || 16;
     }
 
-    // FIXED: Clean font family
     if (node.styles.fontFamily) {
       element.fontFamily = cleanFontFamily(node.styles.fontFamily);
     }
 
-    // FIXED: Normalize font weight
     if (node.styles.fontWeight) {
       element.fontWeight = normalizeFontWeight(node.styles.fontWeight);
     }
 
-    // FIXED: Convert color to hex
     if (node.styles.color) {
       element.color = rgbToHex(node.styles.color);
     }
@@ -142,25 +134,52 @@ function flattenNode(node, elements, depth) {
     }
   }
 
-  // FIXED: Better filtering - skip empty divs
+  // FIXED: Better filtering - skip container divs with ONLY background
   const isVisible = element.opacity > 0.01;
-  const hasContent =
-    element.text ||
-    element.src ||
-    element.svgDataUrl ||
-    element.imageData ||
-    element.svgData ||
-    (element.fills && element.fills.length > 0);
+  const hasMedia =
+    element.src || element.svgDataUrl || element.imageData || element.svgData;
+  const hasText = element.text && element.text.trim().length > 0;
+  const hasFills = element.fills && element.fills.length > 0;
   const hasReasonableSize = element.width > 10 && element.height > 10;
-  const notTooSmall = element.width * element.height > 100; // Skip tiny elements
+  const notTinyArea = element.width * element.height > 100;
 
-  if (isVisible && hasContent && hasReasonableSize && notTooSmall) {
+  // Only add if has MEANINGFUL content (not just a colored div)
+  const hasContentToRender = hasMedia || hasText;
+  const isBackgroundDiv =
+    hasFills && !hasText && !hasMedia && element.hasChildren;
+
+  if (
+    isVisible &&
+    hasReasonableSize &&
+    notTinyArea &&
+    !isBackgroundDiv &&
+    (hasContentToRender || hasFills)
+  ) {
     elements.push(element);
   }
 
   if (node.children && Array.isArray(node.children)) {
     node.children.forEach((child) => flattenNode(child, elements, depth + 1));
   }
+}
+
+// FIXED: Calculate actual board dimensions from all elements
+function calculateBoardDimensions(elements) {
+  let maxX = 1920;
+  let maxY = 1080;
+
+  elements.forEach((el) => {
+    const endX = el.x + el.width;
+    const endY = el.y + el.height;
+    if (endX > maxX) maxX = endX;
+    if (endY > maxY) maxY = endY;
+  });
+
+  // Add padding
+  return {
+    width: Math.ceil(maxX + 100),
+    height: Math.ceil(maxY + 100),
+  };
 }
 
 async function importImage(imageDataArray, mime, element) {
@@ -291,20 +310,24 @@ async function importWebsite(data) {
     throw new Error("No elements found in data");
   }
 
+  sendToUI("progress", { message: "Calculating dimensions...", percent: 3 });
+
+  // FIXED: Calculate actual dimensions from elements
+  const dimensions = calculateBoardDimensions(elements);
+  console.log(
+    "[Importer Pro] Board dimensions:",
+    dimensions.width,
+    "x",
+    dimensions.height
+  );
+
   sendToUI("progress", { message: "Creating board...", percent: 5 });
 
   const board = penpot.createBoard();
   board.name = data.metadata?.title || "Imported Website";
-
-  const width = data.metadata?.viewport?.width || data.metadata?.width || 1920;
-  const height =
-    data.metadata?.viewport?.height || data.metadata?.height || 1080;
-
-  board.resize(width, height);
+  board.resize(dimensions.width, dimensions.height);
   board.x = 0;
   board.y = 0;
-
-  // FIXED: Dark background
   board.fills = [{ fillColor: "#09090b", fillOpacity: 1 }];
 
   const total = elements.length;
@@ -362,6 +385,12 @@ async function importWebsite(data) {
   }
 
   console.log("[Importer Pro] Import complete:", imported, "elements created");
+  console.log(
+    "[Importer Pro] Final board size:",
+    dimensions.width,
+    "x",
+    dimensions.height
+  );
 
   penpot.selection = [board];
   sendToUI("progress", {
