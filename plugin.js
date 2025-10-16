@@ -315,6 +315,20 @@ function importShape(element) {
       rect.fills = element.fills;
     }
 
+    // ADDED: Handle radial gradient backgrounds as colored shapes
+    if (
+      element.styles &&
+      element.styles.backgroundImage &&
+      element.styles.backgroundImage.includes("radial-gradient")
+    ) {
+      // Extract first color from radial-gradient
+      const match = element.styles.backgroundImage.match(/rgba?\([\d,\s.]+\)/);
+      if (match) {
+        const color = rgbToHex(match[0]);
+        rect.fills = [{ fillColor: color, fillOpacity: 0.3 }]; // Semi-transparent
+      }
+    }
+
     if (element.borderRadius) {
       rect.borderRadius = element.borderRadius;
     }
