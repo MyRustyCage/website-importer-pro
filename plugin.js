@@ -221,16 +221,35 @@ async function importImage(imageDataArray, mime, element) {
     const actualWidth = imageMedia.width || element.width;
     const actualHeight = imageMedia.height || element.height;
 
+    // Use scraped layout dimensions as target size
+    const layoutWidth = element.width;
+    const layoutHeight = element.height;
+
+    // Calculate aspect ratios
+    const imageAspect = actualWidth / actualHeight;
+    const layoutAspect = layoutWidth / layoutHeight;
+
+    let finalWidth, finalHeight;
+
+    // Scale to fit within layout bounds while maintaining aspect ratio
+    if (imageAspect > layoutAspect) {
+      // Image is wider - fit to width
+      finalWidth = layoutWidth;
+      finalHeight = layoutWidth / imageAspect;
+    } else {
+      // Image is taller - fit to height
+      finalHeight = layoutHeight;
+      finalWidth = layoutHeight * imageAspect;
+    }
+
     console.log(
-      `[Importer Pro] Image dimensions - Scraped: ${element.width}x${element.height}, Actual: ${actualWidth}x${actualHeight}`
+      `[Importer Pro] Dimensions - Layout: ${layoutWidth}x${layoutHeight}, Final: ${finalWidth}x${finalHeight}`
     );
 
     const rect = penpot.createRectangle();
     rect.x = element.x;
     rect.y = element.y;
-
-    // Use actual image dimensions instead of scraped dimensions
-    rect.resize(actualWidth, actualHeight);
+    rect.resize(finalWidth, finalHeight);
     rect.name = element.name + " (Image)";
 
     rect.fills = [
@@ -241,7 +260,6 @@ async function importImage(imageDataArray, mime, element) {
       },
     ];
 
-    // Lock proportions at shape level
     rect.proportionLock = true;
 
     return rect;
@@ -272,16 +290,35 @@ async function importSVG(imageDataArray, element) {
     const actualWidth = imageMedia.width || element.width;
     const actualHeight = imageMedia.height || element.height;
 
+    // Use scraped layout dimensions as target size
+    const layoutWidth = element.width;
+    const layoutHeight = element.height;
+
+    // Calculate aspect ratios
+    const imageAspect = actualWidth / actualHeight;
+    const layoutAspect = layoutWidth / layoutHeight;
+
+    let finalWidth, finalHeight;
+
+    // Scale to fit within layout bounds while maintaining aspect ratio
+    if (imageAspect > layoutAspect) {
+      // Image is wider - fit to width
+      finalWidth = layoutWidth;
+      finalHeight = layoutWidth / imageAspect;
+    } else {
+      // Image is taller - fit to height
+      finalHeight = layoutHeight;
+      finalWidth = layoutHeight * imageAspect;
+    }
+
     console.log(
-      `[Importer Pro] SVG dimensions - Scraped: ${element.width}x${element.height}, Actual: ${actualWidth}x${actualHeight}`
+      `[Importer Pro] SVG Dimensions - Layout: ${layoutWidth}x${layoutHeight}, Final: ${finalWidth}x${finalHeight}`
     );
 
     const rect = penpot.createRectangle();
     rect.x = element.x;
     rect.y = element.y;
-
-    // Use actual image dimensions instead of scraped dimensions
-    rect.resize(actualWidth, actualHeight);
+    rect.resize(finalWidth, finalHeight);
     rect.name = element.name + " (SVG)";
 
     rect.fills = [
@@ -292,7 +329,6 @@ async function importSVG(imageDataArray, element) {
       },
     ];
 
-    // Lock proportions at shape level
     rect.proportionLock = true;
 
     return rect;
