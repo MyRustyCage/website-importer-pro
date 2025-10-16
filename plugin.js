@@ -1,4 +1,4 @@
-// plugin.js - Website Importer Pro - FINAL with Board Calculation & Better Filtering
+// plugin.js - Website Importer Pro - FINAL with Gradient Text & Text Align
 console.log("[Importer Pro] Loading...");
 
 penpot.ui.open("Website Importer Pro", "./website-importer-pro/ui.html", {
@@ -28,6 +28,26 @@ function rgbToHex(rgbString) {
   const b = parseInt(match[3]).toString(16).padStart(2, "0");
 
   return `#${r}${g}${b}`;
+}
+
+// FIXED: Extract color from gradient for text
+function extractColorFromGradient(gradientString) {
+  if (!gradientString) return null;
+
+  // linear-gradient(to right bottom, rgb(255, 255, 255), rgb(113, 113, 122))
+  // Extract first color (usually the main color)
+  const match = gradientString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  if (match) {
+    return rgbToHex(`rgb(${match[1]}, ${match[2]}, ${match[3]})`);
+  }
+
+  // If gradient goes from white to gray, use white
+  if (gradientString.includes("255, 255, 255")) {
+    return "#ffffff";
+  }
+
+  // Fallback to gray
+  return "#71717a";
 }
 
 function cleanFontFamily(fontFamilyStr) {
@@ -96,10 +116,24 @@ function flattenNode(node, elements, depth) {
     fontWeight: "400",
     color: "#000000",
     opacity: 1,
+    textAlign: "left",
     hasChildren: node.children && node.children.length > 0,
   };
 
   if (node.styles) {
+    // FIXED: Handle gradient text
+    if (
+      node.styles.backgroundImage &&
+      node.styles.backgroundImage.includes("gradient") &&
+      (node.styles.color === "rgba(0, 0, 0, 0)" ||
+        node.styles.color === "transparent")
+    ) {
+      // Extract color from gradient
+      element.color = extractColorFromGradient(node.styles.backgroundImage);
+    } else if (node.styles.color) {
+      element.color = rgbToHex(node.styles.color);
+    }
+
     if (
       node.styles.backgroundColor &&
       node.styles.backgroundColor !== "rgba(0, 0, 0, 0)" &&
@@ -121,16 +155,16 @@ function flattenNode(node, elements, depth) {
       element.fontWeight = normalizeFontWeight(node.styles.fontWeight);
     }
 
-    if (node.styles.color) {
-      element.color = rgbToHex(node.styles.color);
-    }
-
     if (node.styles.opacity) {
       element.opacity = parseFloat(node.styles.opacity) || 1;
     }
+
+    // FIXED: Text align
+    if (node.styles.textAlign) {
+      element.textAlign = node.styles.textAlign;
+    }
   }
 
-  // FIXED: Better filtering - skip container divs with ONLY background
   const isVisible = element.opacity > 0.01;
   const hasMedia =
     element.src || element.svgDataUrl || element.imageData || element.svgData;
@@ -139,7 +173,6 @@ function flattenNode(node, elements, depth) {
   const hasReasonableSize = element.width > 10 && element.height > 10;
   const notTinyArea = element.width * element.height > 100;
 
-  // Only add if has MEANINGFUL content (not just a colored div)
   const hasContentToRender = hasMedia || hasText;
   const isBackgroundDiv =
     hasFills && !hasText && !hasMedia && element.hasChildren;
@@ -159,7 +192,6 @@ function flattenNode(node, elements, depth) {
   }
 }
 
-// FIXED: Calculate actual board dimensions from all elements
 function calculateBoardDimensions(elements) {
   let maxX = 1920;
   let maxY = 1080;
@@ -171,7 +203,6 @@ function calculateBoardDimensions(elements) {
     if (endY > maxY) maxY = endY;
   });
 
-  // Add padding
   return {
     width: Math.ceil(maxX + 100),
     height: Math.ceil(maxY + 100),
@@ -257,6 +288,17 @@ function importText(element) {
       ];
     }
 
+    // FIXED: Apply text align
+    if (element.textAlign) {
+      if (element.textAlign === "center") {
+        text.horizontalAlign = "center";
+      } else if (element.textAlign === "right") {
+        text.horizontalAlign = "right";
+      } else {
+        text.horizontalAlign = "left";
+      }
+    }
+
     return text;
   } catch (err) {
     console.error("[Importer Pro] Text creation error:", err);
@@ -308,7 +350,6 @@ async function importWebsite(data) {
 
   sendToUI("progress", { message: "Calculating dimensions...", percent: 3 });
 
-  // FIXED: Calculate actual dimensions from elements
   const dimensions = calculateBoardDimensions(elements);
   console.log(
     "[Importer Pro] Board dimensions:",
